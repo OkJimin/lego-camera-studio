@@ -1,13 +1,18 @@
-import { LoginButton } from "./components/LoginButton";
+import { MobileController } from "./demo/MobileController";
+import { PhoneWorkspace } from "./demo/PhoneWorkspace";
+import { StartScreen } from "./demo/StartScreen";
+import { useWorkflowStore } from "./demo/useWorkflowStore";
+import { WebWorkspace } from "./demo/WebWorkspace";
 import "./App.css";
 
 function App() {
-  return (
-    <div style={{ padding: "1rem" }}>
-      <h1>레고 카메라 스튜디오</h1>
-      <LoginButton />
-    </div>
-  );
+  const mode = useWorkflowStore((s) => s.mode);
+  const phoneSessionId = useWorkflowStore((s) => s.phoneSessionId);
+
+  if (phoneSessionId) return <MobileController sessionId={phoneSessionId} />;
+  if (mode === "web") return <WebWorkspace />;
+  if (mode === "phone-setup") return <PhoneWorkspace />;
+  return <StartScreen />;
 }
 
 export default App;
