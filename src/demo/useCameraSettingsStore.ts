@@ -34,12 +34,20 @@ export const FORMAT_PRESETS: FormatPreset[] = [
   { label: "IMAX (1.43:1)", aspect: 1.43 },
 ];
 
+export const DEFAULT_LENS_FOV = 50;
+
 interface CameraSettingsState {
   formatIndex: number;
+  // Mirrors the last lens preset picked, kept reactive (unlike the main scene
+  // camera's live fov) so it can be pushed to a paired phone's viewfinder.
+  lensFov: number;
   setFormatIndex: (index: number) => void;
+  setLensFov: (fov: number) => void;
 }
 
 export const useCameraSettingsStore = create<CameraSettingsState>((set) => ({
   formatIndex: 0,
+  lensFov: DEFAULT_LENS_FOV,
   setFormatIndex: (index) => set({ formatIndex: index }),
+  setLensFov: (fov) => set({ lensFov: fov }),
 }));

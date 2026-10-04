@@ -8,6 +8,7 @@ import { SaveAccountPanel } from "./SaveAccountPanel";
 import { SelectionHint } from "./SelectionHint";
 import { SettingsDrawer } from "./SettingsDrawer";
 import { ShotButtons } from "./ShotButtons";
+import { SpeedSettingsPanel } from "./SpeedSettingsPanel";
 import { useSceneShortcuts } from "./useSceneShortcuts";
 import { useWorkflowStore } from "./useWorkflowStore";
 
@@ -32,6 +33,7 @@ export function WebWorkspace() {
           <SaveAccountPanel />
           <LightingPanel />
           <CameraSettingsPanel />
+          <SpeedSettingsPanel />
           <ShotButtons />
         </SettingsDrawer>
       </div>

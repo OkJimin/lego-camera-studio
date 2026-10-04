@@ -8,6 +8,7 @@ import { useCameraPathStore } from "./useCameraPathStore";
 import { PersonFigure } from "./PersonFigure";
 import { useClickHandlers } from "./useClickHandlers";
 import { playbackClock } from "./playbackClock";
+import { DEFAULT_OBJECT_MOTION_SECONDS } from "./useSpeedSettingsStore";
 
 // Shared unit geometries: every block of a given kind starts at [1,1,1] and is
 // resized purely via the mesh's `scale`, so one geometry instance per kind is
@@ -16,12 +17,24 @@ const BOX_GEOMETRY = new THREE.BoxGeometry(1, 1, 1);
 const SPHERE_GEOMETRY = new THREE.SphereGeometry(0.5, 24, 24);
 const CONE_GEOMETRY = new THREE.ConeGeometry(0.5, 1, 24);
 
+function triangleWave(elapsed: number, legSeconds: number) {
+  const cycle = elapsed % (legSeconds * 2);
+  return cycle < legSeconds ? cycle / legSeconds : 2 - cycle / legSeconds;
+}
+
 export function Block({
   block,
   interactive = true,
+  loopMotion = false,
+  loopLegSeconds = DEFAULT_OBJECT_MOTION_SECONDS,
 }: {
   block: PlacedBlock;
   interactive?: boolean;
+  // Animate motion as a continuous back-and-forth loop instead of following
+  // the desktop's recorded camera-path playback clock.
+  loopMotion?: boolean;
+  // One-way duration of that loop, only used when loopMotion is true.
+  loopLegSeconds?: number;
 }) {
   const addBlock = useBlockStore((s) => s.addBlock);
   const selectedKind = useBlockStore((s) => s.selectedKind);
@@ -70,12 +83,20 @@ export function Block({
 
   // While the camera path is playing, animate between the saved start/end
   // pose on the same shared timeline as the camera, instead of the static position.
-  useFrame(() => {
-    if (!isPlaying || !block.motion || !targetObject) return;
-    const t =
-      playbackClock.duration > 0
-        ? Math.min(Math.max(playbackClock.elapsed / playbackClock.duration, 0), 1)
-        : 0;
+  // In loopMotion mode (no recorded camera path to sync against) it just loops
+  // continuously instead, driven by the scene's own clock.
+  useFrame((state) => {
+    if (!block.motion || !targetObject) return;
+    let t: number;
+    if (loopMotion) {
+      t = triangleWave(state.clock.elapsedTime, loopLegSeconds);
+    } else {
+      if (!isPlaying) return;
+      t =
+        playbackClock.duration > 0
+          ? Math.min(Math.max(playbackClock.elapsed / playbackClock.duration, 0), 1)
+          : 0;
+    }
     const [sx, sy, sz] = block.motion.startPosition;
     const [ex, ey, ez] = block.motion.endPosition;
     targetObject.position.set(sx + (ex - sx) * t, sy + (ey - sy) * t, sz + (ez - sz) * t);
@@ -83,10 +104,10 @@ export function Block({
 
   // Once playback stops, snap back to the resting (React-driven) position.
   useEffect(() => {
-    if (!isPlaying && targetObject && block.motion) {
+    if (!loopMotion && !isPlaying && targetObject && block.motion) {
       targetObject.position.set(...block.position);
     }
-  }, [isPlaying]);
+  }, [isPlaying, loopMotion]);
 
   const sharedProps = {
     position: block.position,

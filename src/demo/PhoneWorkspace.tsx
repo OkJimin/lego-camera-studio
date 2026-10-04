@@ -1,8 +1,12 @@
 import { BlockPalette } from "./BlockPalette";
+import { CameraSettingsPanel } from "./CameraSettingsPanel";
+import { LightingPanel } from "./LightingPanel";
 import { PhonePairingPanel } from "./PhonePairingPanel";
 import { SaveAccountPanel } from "./SaveAccountPanel";
 import { Scene } from "./Scene";
 import { SelectionHint } from "./SelectionHint";
+import { SettingsDrawer } from "./SettingsDrawer";
+import { SpeedSettingsPanel } from "./SpeedSettingsPanel";
 import { useSceneShortcuts } from "./useSceneShortcuts";
 import { useWorkflowStore } from "./useWorkflowStore";
 
@@ -22,7 +26,12 @@ export function PhoneWorkspace() {
       </div>
       <div className="right-rail">
         <SelectionHint />
-        <SaveAccountPanel />
+        <SettingsDrawer>
+          <SaveAccountPanel />
+          <LightingPanel />
+          <CameraSettingsPanel />
+          <SpeedSettingsPanel showTiltPan={false} />
+        </SettingsDrawer>
       </div>
     </div>
   );

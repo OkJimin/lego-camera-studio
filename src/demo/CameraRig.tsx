@@ -10,11 +10,8 @@ import { useHeldMoveKeys } from "./useHeldMoveKeys";
 import { shotActionState } from "./shotActions";
 import { liveCameraPose } from "./liveCameraPose";
 import { playbackClock } from "./playbackClock";
+import { useSpeedSettingsStore } from "./useSpeedSettingsStore";
 
-const MOVE_SPEED = 5;
-const ZOOM_SPEED = 25; // fov degrees per second
-const TILT_SPEED = 0.6; // radians per second
-const PAN_SPEED = 0.6; // radians per second
 const MIN_FOV = 10;
 const MAX_FOV = 90;
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
@@ -84,6 +81,11 @@ export function CameraRig() {
   const orbitRef = useRef<OrbitControlsInstance>(null);
   const heldKeys = useHeldMoveKeys();
   const curveRef = useRef<THREE.CatmullRomCurve3 | null>(null);
+
+  const moveSpeed = useSpeedSettingsStore((s) => s.moveSpeed);
+  const zoomSpeed = useSpeedSettingsStore((s) => s.zoomSpeed);
+  const tiltSpeed = useSpeedSettingsStore((s) => s.tiltSpeed);
+  const panSpeed = useSpeedSettingsStore((s) => s.panSpeed);
 
   useEffect(() => {
     const persp = camera as THREE.PerspectiveCamera;
@@ -157,15 +159,15 @@ export function CameraRig() {
 
     const zoomDir = axisDelta(shotActionState.zoomOut, shotActionState.zoomIn);
     if (zoomDir !== 0) {
-      persp.fov = THREE.MathUtils.clamp(persp.fov + zoomDir * ZOOM_SPEED * delta, MIN_FOV, MAX_FOV);
+      persp.fov = THREE.MathUtils.clamp(persp.fov + zoomDir * zoomSpeed * delta, MIN_FOV, MAX_FOV);
       persp.updateProjectionMatrix();
     }
 
     const tiltDir = axisDelta(shotActionState.tiltUp, shotActionState.tiltDown);
     const panDir = axisDelta(shotActionState.panLeft, shotActionState.panRight);
     if (tiltDir !== 0 || panDir !== 0) {
-      if (tiltDir !== 0) camera.rotateX(tiltDir * TILT_SPEED * delta);
-      if (panDir !== 0) camera.rotateY(panDir * PAN_SPEED * delta);
+      if (tiltDir !== 0) camera.rotateX(tiltDir * tiltSpeed * delta);
+      if (panDir !== 0) camera.rotateY(panDir * panSpeed * delta);
       if (orbitRef.current) resyncOrbitTargetToForward(camera, orbitRef.current);
     }
 
@@ -182,7 +184,7 @@ export function CameraRig() {
         if (keys.has("e")) _move.add(WORLD_UP);
         if (keys.has("q")) _move.addScaledVector(WORLD_UP, -1);
         if (_move.lengthSq() > 0) {
-          _move.normalize().multiplyScalar(MOVE_SPEED * delta);
+          _move.normalize().multiplyScalar(moveSpeed * delta);
           camera.position.add(_move);
           orbitRef.current?.target.add(_move);
           orbitRef.current?.update();

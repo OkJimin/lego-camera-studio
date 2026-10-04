@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { generateId } from "./id";
 
 export type BlockColor = "red" | "yellow" | "blue";
 export type ItemKind = "block" | "sphere" | "cone" | "person";
@@ -93,7 +94,7 @@ export const useBlockStore = create<BlockState>((set, get) => ({
       blocks: [
         ...state.blocks,
         {
-          id: crypto.randomUUID(),
+          id: generateId(),
           kind: state.selectedKind,
           position,
           rotation: [0, 0, 0],

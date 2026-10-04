@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { FORMAT_PRESETS, useCameraSettingsStore } from "./useCameraSettingsStore";
 
-export function AspectMask() {
+export function AspectMask({ aspectOverride }: { aspectOverride?: number }) {
   const formatIndex = useCameraSettingsStore((s) => s.formatIndex);
-  const targetAspect = FORMAT_PRESETS[formatIndex].aspect;
+  const targetAspect = aspectOverride ?? FORMAT_PRESETS[formatIndex].aspect;
   const rootRef = useRef<HTMLDivElement>(null);
   const [bars, setBars] = useState({ vertical: 0, horizontal: 0 });
 

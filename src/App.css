@@ -12,6 +12,13 @@ body,
   font-family: system-ui, sans-serif;
 }
 
+/* Without this, touch devices route single-finger gestures to native
+   scroll/zoom before OrbitControls or our tap-to-place handlers ever see
+   them, so taps on the canvas can silently do nothing on phones/tablets. */
+.demo-shell canvas {
+  touch-action: none;
+}
+
 .side-stack {
   position: absolute;
   top: 1rem;
@@ -306,6 +313,7 @@ button {
 }
 
 .mobile-controller {
+  position: relative;
   width: 100vw;
   min-height: 100vh;
   box-sizing: border-box;
@@ -313,6 +321,59 @@ button {
   font-family: system-ui, sans-serif;
   text-align: center;
   background: #f3f1ea;
+}
+
+/* Once connected, the phone is held sideways to shoot, so let the viewfinder
+   fill the landscape screen and float the remaining text/code over it instead
+   of stacking everything in a tall, mostly-empty column. */
+@media (orientation: landscape) {
+  .mobile-controller--active {
+    min-height: 100vh;
+    height: 100vh;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .mobile-controller--active h1,
+  .mobile-controller--active .mobile-controller__code {
+    display: none;
+  }
+
+  .mobile-controller--active .mobile-controller__hint {
+    position: absolute;
+    top: 0.6rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20;
+    margin: 0;
+    font-size: 0.75rem;
+    background: rgba(255, 255, 255, 0.85);
+    padding: 0.2rem 0.7rem;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+
+  .mobile-controller--active .phone-viewfinder {
+    width: 100vw;
+    height: 100vh;
+    max-height: none;
+    aspect-ratio: auto;
+    border-radius: 0;
+  }
+
+  .mobile-controller--active .mobile-controller__readout {
+    position: absolute;
+    bottom: 0.6rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20;
+    margin: 0;
+    font-size: 0.7rem;
+    background: rgba(255, 255, 255, 0.85);
+    padding: 0.2rem 0.7rem;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
 }
 
 .mobile-controller__code {
@@ -336,7 +397,70 @@ button {
 }
 
 .mobile-controller__readout {
-  margin-top: 1.5rem;
-  font-size: 1rem;
-  line-height: 1.8;
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.mobile-controller__hint {
+  margin: 0.5rem 0 1rem;
+}
+
+.phone-viewfinder {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  max-height: 70vh;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.phone-viewfinder canvas {
+  touch-action: none;
+}
+
+.joystick-base {
+  position: absolute;
+  left: 1rem;
+  bottom: 1rem;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.joystick-knob {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  pointer-events: none;
+}
+
+.phone-zoom-buttons {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.phone-zoom-buttons__button {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.25);
+  color: white;
+  font-size: 1.4rem;
+  line-height: 1;
+  touch-action: none;
+  user-select: none;
 }

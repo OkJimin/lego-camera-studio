@@ -9,7 +9,13 @@ import { useCameraPathStore } from "./useCameraPathStore";
 export function CameraSettingsPanel() {
   const formatIndex = useCameraSettingsStore((s) => s.formatIndex);
   const setFormatIndex = useCameraSettingsStore((s) => s.setFormatIndex);
+  const setLensFov = useCameraSettingsStore((s) => s.setLensFov);
   const requestSetFov = useCameraPathStore((s) => s.requestSetFov);
+
+  const pickLens = (fov: number) => {
+    requestSetFov(fov);
+    setLensFov(fov);
+  };
 
   return (
     <div className="panel">
@@ -22,7 +28,7 @@ export function CameraSettingsPanel() {
             key={lens.label}
             type="button"
             className="chip"
-            onClick={() => requestSetFov(focalLengthToFov(lens.focalLengthMm))}
+            onClick={() => pickLens(focalLengthToFov(lens.focalLengthMm))}
           >
             {lens.label}
           </button>
