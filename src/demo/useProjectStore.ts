@@ -13,11 +13,17 @@ import {
 import { firestore } from "../lib/firebase";
 import { useAuthStore } from "../store/authStore";
 import { deserializePose, serializePose } from "./cameraPose";
+import type { CaptureData } from "./CaptureWorkspace";
+import { deserializeKeyframes, serializeKeyframes } from "./guidePath";
+import type { CameraPathSync } from "./guidePath";
 import { useBlockStore } from "./useBlockStore";
 import type { PlacedBlock } from "./useBlockStore";
 import { DEFAULT_AUTO_MOVE_DURATION, useCameraPathStore } from "./useCameraPathStore";
+import { DEFAULT_LENS_FOV, FORMAT_PRESETS, useCameraSettingsStore } from "./useCameraSettingsStore";
 import { DEFAULT_LIGHTING, useLightingStore } from "./useLightingStore";
 import type { LightingSettings } from "./useLightingStore";
+import { DEFAULT_SPEED_SETTINGS, useSpeedSettingsStore } from "./useSpeedSettingsStore";
+import type { SpeedSettings } from "./useSpeedSettingsStore";
 
 export interface ProjectSummary {
   id: string;
@@ -26,11 +32,30 @@ export interface ProjectSummary {
 
 const DEFAULT_PROJECT_NAME = "이름 없는 프로젝트";
 
+// Anonymous (phone-pairing) sessions don't own saved projects, so they must not
+// count as signed in here, or the project would be saved under a throwaway uid.
 async function ensureSignedInUid(): Promise<string | null> {
-  if (!useAuthStore.getState().user) {
+  const user = useAuthStore.getState().user;
+  if (!user || user.isAnonymous) {
     await useAuthStore.getState().signInWithGoogle();
   }
-  return useAuthStore.getState().user?.uid ?? null;
+  const signedIn = useAuthStore.getState().user;
+  return signedIn && !signedIn.isAnonymous ? signedIn.uid : null;
+}
+
+export async function fetchProjectForShoot(id: string): Promise<CaptureData | null> {
+  const snapshot = await getDoc(doc(firestore, "projects", id));
+  if (!snapshot.exists()) return null;
+  const data = snapshot.data();
+  const cameraPath = (data.cameraPath ?? null) as CameraPathSync | null;
+  const lens = (data.lens ?? {}) as { fov?: number; formatIndex?: number };
+  const formatIndex = typeof lens.formatIndex === "number" ? lens.formatIndex : 0;
+  return {
+    blocks: (data.blocks ?? []) as PlacedBlock[],
+    path: cameraPath && cameraPath.keys?.length >= 2 ? cameraPath : null,
+    fov: typeof lens.fov === "number" ? lens.fov : DEFAULT_LENS_FOV,
+    aspect: FORMAT_PRESETS[formatIndex]?.aspect,
+  };
 }
 
 interface ProjectState {
@@ -64,8 +89,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set({ isSaving: true });
     try {
       const { blocks } = useBlockStore.getState();
-      const { home, end, autoMoveDuration } = useCameraPathStore.getState();
+      const { home, end, autoMoveDuration, keyframes } = useCameraPathStore.getState();
       const lighting = useLightingStore.getState();
+      const cameraSettings = useCameraSettingsStore.getState();
+      const speed = useSpeedSettingsStore.getState();
       const { currentProjectId, currentProjectName } = get();
 
       const data = {
@@ -75,7 +102,19 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         blocks: blocks as unknown as Record<string, unknown>[],
         cameraHome: serializePose(home),
         cameraEnd: serializePose(end),
+        cameraPath: keyframes.length >= 2 ? serializeKeyframes(keyframes) : null,
         autoMoveDuration,
+        lens: {
+          fov: cameraSettings.lensFov,
+          formatIndex: cameraSettings.formatIndex,
+        },
+        speed: {
+          moveSpeed: speed.moveSpeed,
+          zoomSpeed: speed.zoomSpeed,
+          tiltSpeed: speed.tiltSpeed,
+          panSpeed: speed.panSpeed,
+          objectMotionSeconds: speed.objectMotionSeconds,
+        } satisfies SpeedSettings,
         lighting: {
           ambientPercent: lighting.ambientPercent,
           keyPercent: lighting.keyPercent,
@@ -134,9 +173,20 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         typeof data.autoMoveDuration === "number"
           ? data.autoMoveDuration
           : DEFAULT_AUTO_MOVE_DURATION,
-      keyframes: [],
+      keyframes: data.cameraPath ? deserializeKeyframes(data.cameraPath as CameraPathSync) : [],
       isPlaying: false,
       isRecording: false,
+    });
+
+    const lens = (data.lens ?? {}) as { fov?: number; formatIndex?: number };
+    useCameraSettingsStore.setState({
+      lensFov: typeof lens.fov === "number" ? lens.fov : DEFAULT_LENS_FOV,
+      formatIndex: typeof lens.formatIndex === "number" ? lens.formatIndex : 0,
+    });
+
+    useSpeedSettingsStore.setState({
+      ...DEFAULT_SPEED_SETTINGS,
+      ...(data.speed as Partial<SpeedSettings> | undefined),
     });
 
     useLightingStore.setState({

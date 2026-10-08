@@ -464,3 +464,169 @@ button {
   touch-action: none;
   user-select: none;
 }
+
+.capture-stage {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  overflow: hidden;
+}
+
+/* The frame keeps the camera's own aspect ratio and is fitted inside the
+   screen, so the guide and the framing match exactly what gets recorded. */
+.capture-frame {
+  position: relative;
+  width: min(100vw, calc(100vh * var(--frame-aspect)));
+  aspect-ratio: var(--frame-aspect);
+  overflow: hidden;
+}
+
+.capture-video,
+.capture-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.capture-video {
+  object-fit: cover;
+}
+
+.capture-overlay {
+  pointer-events: none;
+}
+
+.capture-overlay canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.capture-countdown {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 6rem;
+  font-weight: bold;
+  color: white;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  z-index: 30;
+}
+
+.capture-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem 1.25rem;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  color: white;
+  font-family: system-ui, sans-serif;
+}
+
+.capture-bar__message {
+  margin: 0;
+  text-align: center;
+  font-size: 0.9rem;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+.capture-bar__message a {
+  color: #ffd66b;
+}
+
+.capture-bar__opacity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.8rem;
+}
+
+.capture-bar__opacity input {
+  width: 100%;
+}
+
+.capture-bar__buttons {
+  display: flex;
+  justify-content: center;
+}
+
+.capture-bar__buttons button {
+  padding: 0.8rem 2rem;
+  font-size: 1rem;
+  border: none;
+  border-radius: 999px;
+  background: #e0362c;
+  color: white;
+}
+
+.capture-bar__buttons button:disabled {
+  background: #666;
+}
+
+.capture-bar__secondary {
+  background: rgba(255, 255, 255, 0.85) !important;
+  color: #333 !important;
+  margin-right: 0.5rem;
+}
+
+.shoot-library {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 2rem 1.25rem;
+  font-family: system-ui, sans-serif;
+  background: #f3f1ea;
+}
+
+.shoot-library h1 {
+  margin: 0 0 1rem;
+  font-size: 1.3rem;
+}
+
+.shoot-library__hint {
+  color: #555;
+  font-size: 0.9rem;
+}
+
+.shoot-library__error {
+  color: #c0392b;
+  font-size: 0.9rem;
+}
+
+.shoot-library__primary {
+  margin-top: 1rem;
+  padding: 0.9rem 1.5rem;
+  font-size: 1rem;
+  border: none;
+  border-radius: 10px;
+  background: #333;
+  color: white;
+}
+
+.shoot-library__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.shoot-library__item {
+  width: 100%;
+  padding: 0.9rem 1rem;
+  text-align: left;
+  font-size: 1rem;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  background: white;
+}

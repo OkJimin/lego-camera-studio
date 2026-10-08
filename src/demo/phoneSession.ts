@@ -4,6 +4,7 @@ import { auth, realtimeDb } from "../lib/firebase";
 import type { PlacedBlock } from "./useBlockStore";
 import type { LightingSettings } from "./useLightingStore";
 import type { SpeedSettings } from "./useSpeedSettingsStore";
+import type { CameraPathSync } from "./guidePath";
 
 export interface PhoneOrientation {
   alpha: number;
@@ -157,8 +158,17 @@ export function watchSpeedSettings(
   return onValue(speedRef, (snapshot) => callback(snapshot.val() ?? null));
 }
 
-export function mobileSessionUrl(sessionId: string): string {
+export function syncCameraPath(sessionId: string, path: CameraPathSync) {
+  set(ref(realtimeDb, `sessions/${sessionId}/cameraPath`), path);
+}
+
+export function watchCameraPath(sessionId: string, callback: (path: CameraPathSync | null) => void) {
+  const pathRef = ref(realtimeDb, `sessions/${sessionId}/cameraPath`);
+  return onValue(pathRef, (snapshot) => callback(snapshot.val() ?? null));
+}
+
+export function mobileSessionUrl(sessionId: string, mode: "phone" | "capture" = "phone"): string {
   const url = new URL(window.location.href);
-  url.search = `?mode=phone&session=${sessionId}`;
+  url.search = `?mode=${mode}&session=${sessionId}`;
   return url.toString();
 }

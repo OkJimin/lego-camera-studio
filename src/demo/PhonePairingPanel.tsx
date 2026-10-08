@@ -5,6 +5,7 @@ import {
   getOrCreatePhoneSession,
   mobileSessionUrl,
   syncBlocks,
+  syncCameraPath,
   syncCameraSettings,
   syncHomePosition,
   syncLighting,
@@ -13,8 +14,10 @@ import {
   watchPhoneConnected,
 } from "./phoneSession";
 import type { PhoneOrientation } from "./phoneSession";
+import { serializeKeyframes } from "./guidePath";
 import { liveCameraPose } from "./liveCameraPose";
 import { useBlockStore } from "./useBlockStore";
+import { useCameraPathStore } from "./useCameraPathStore";
 import { FORMAT_PRESETS, useCameraSettingsStore } from "./useCameraSettingsStore";
 import { useLightingStore } from "./useLightingStore";
 import { useSpeedSettingsStore } from "./useSpeedSettingsStore";
@@ -25,6 +28,7 @@ const HOME_POSITION_SYNC_INTERVAL_MS = 150;
 export function PhonePairingPanel() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [captureQrDataUrl, setCaptureQrDataUrl] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [orientation, setOrientation] = useState<PhoneOrientation | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,9 +40,12 @@ export function PhonePairingPanel() {
     try {
       const id = await getOrCreatePhoneSession();
       setSessionId(id);
-      const url = mobileSessionUrl(id);
-      const dataUrl = await QRCode.toDataURL(url, { width: 220, margin: 1 });
+      const [dataUrl, captureUrl] = await Promise.all([
+        QRCode.toDataURL(mobileSessionUrl(id), { width: 220, margin: 1 }),
+        QRCode.toDataURL(mobileSessionUrl(id, "capture"), { width: 220, margin: 1 }),
+      ]);
       setQrDataUrl(dataUrl);
+      setCaptureQrDataUrl(captureUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : "연결 생성에 실패했어요");
     } finally {
@@ -106,6 +113,22 @@ export function PhonePairingPanel() {
       ]);
     }, HOME_POSITION_SYNC_INTERVAL_MS);
     return () => clearInterval(id);
+  }, [sessionId]);
+
+  // Send the recorded camera path once a recording settles, so the capture
+  // page can replay it as a guide. Skipped during recording to avoid flooding RTDB.
+  useEffect(() => {
+    if (!sessionId) return;
+    const pushPath = (state: ReturnType<typeof useCameraPathStore.getState>) => {
+      if (state.isRecording || state.keyframes.length < 2) return;
+      syncCameraPath(sessionId, serializeKeyframes(state.keyframes));
+    };
+    pushPath(useCameraPathStore.getState());
+    return useCameraPathStore.subscribe((state, prev) => {
+      if (state.keyframes !== prev.keyframes || state.isRecording !== prev.isRecording) {
+        pushPath(state);
+      }
+    });
   }, [sessionId]);
 
   // Mirror lens/format so the phone's viewfinder frames the shot the same
@@ -178,6 +201,10 @@ export function PhonePairingPanel() {
                 돼요
               </p>
             </>
+          )}
+          <p className="panel__hint">촬영 모드 (반투명 가이드 위에서 촬영): 아래 QR을 스캔하세요</p>
+          {captureQrDataUrl && (
+            <img src={captureQrDataUrl} alt="촬영 모드 QR 코드" width={180} height={180} />
           )}
           <p className="panel__hint">코드: {sessionId}</p>
 
