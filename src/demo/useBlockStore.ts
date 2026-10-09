@@ -1,13 +1,28 @@
 import { create } from "zustand";
+import { generateId } from "./id";
 
 export type BlockColor = "red" | "yellow" | "blue";
 export type ItemKind = "block" | "sphere" | "cone" | "person";
 export type GizmoMode = "translate" | "scale" | "rotate";
 export const ROTATION_SNAP_DEG = 10;
 
+export const DEFAULT_OBJECT_MOTION_SECONDS = 3;
+export const OBJECT_MOTION_SECONDS_RANGE = { min: 0.5, max: 30 };
+
 export interface ObjectMotion {
   startPosition: [number, number, number];
   endPosition: [number, number, number];
+  // Time the object takes to travel start -> end, counted from the start of
+  // playback; it then stays at the end. Missing on projects saved before this
+  // was per-object: those stretch the move across the whole camera path.
+  durationSeconds?: number;
+}
+
+// 0..1 progress of a one-way move at `elapsed` seconds into playback.
+export function motionProgress(motion: ObjectMotion, elapsed: number, totalSeconds: number): number {
+  const span = motion.durationSeconds ?? totalSeconds;
+  if (span <= 0) return 0;
+  return Math.min(Math.max(elapsed / span, 0), 1);
 }
 
 export interface PlacedBlock {
@@ -18,6 +33,8 @@ export interface PlacedBlock {
   size: [number, number, number];
   color: BlockColor;
   motion?: ObjectMotion;
+  // Left out of exported guide videos (and the 3D shooting guide); it stays in the editor.
+  hideInExport?: boolean;
 }
 
 export const BLOCK_COLORS: Record<BlockColor, string> = {
@@ -45,6 +62,20 @@ export function worldHeight(kind: ItemKind, size: [number, number, number]) {
   return BASE_ITEM_HEIGHT[kind] * size[1];
 }
 
+// Where the block is `elapsed` seconds into playback (its resting spot when not playing).
+export function blockPositionAt(
+  block: PlacedBlock,
+  playing: boolean,
+  elapsed: number,
+  totalSeconds: number,
+): [number, number, number] {
+  if (!block.motion || !playing) return block.position;
+  const t = motionProgress(block.motion, elapsed, totalSeconds);
+  const [sx, sy, sz] = block.motion.startPosition;
+  const [ex, ey, ez] = block.motion.endPosition;
+  return [sx + (ex - sx) * t, sy + (ey - sy) * t, sz + (ez - sz) * t];
+}
+
 const HISTORY_LIMIT = 50;
 
 interface BlockState {
@@ -70,6 +101,8 @@ interface BlockState {
   undo: () => void;
   setMotionStart: (id: string) => void;
   setMotionEnd: (id: string) => void;
+  setMotionDuration: (id: string, seconds: number) => void;
+  setHideInExport: (id: string, hidden: boolean) => void;
   clearMotion: (id: string) => void;
 }
 
@@ -93,7 +126,7 @@ export const useBlockStore = create<BlockState>((set, get) => ({
       blocks: [
         ...state.blocks,
         {
-          id: crypto.randomUUID(),
+          id: generateId(),
           kind: state.selectedKind,
           position,
           rotation: [0, 0, 0],
@@ -142,7 +175,14 @@ export const useBlockStore = create<BlockState>((set, get) => ({
     set((state) => ({
       blocks: state.blocks.map((b) =>
         b.id === id
-          ? { ...b, motion: { startPosition: b.position, endPosition: b.motion?.endPosition ?? b.position } }
+          ? {
+              ...b,
+              motion: {
+                startPosition: b.position,
+                endPosition: b.motion?.endPosition ?? b.position,
+                durationSeconds: b.motion ? b.motion.durationSeconds : DEFAULT_OBJECT_MOTION_SECONDS,
+              },
+            }
           : b,
       ),
     })),
@@ -150,8 +190,31 @@ export const useBlockStore = create<BlockState>((set, get) => ({
     set((state) => ({
       blocks: state.blocks.map((b) =>
         b.id === id
-          ? { ...b, motion: { startPosition: b.motion?.startPosition ?? b.position, endPosition: b.position } }
+          ? {
+              ...b,
+              motion: {
+                startPosition: b.motion?.startPosition ?? b.position,
+                endPosition: b.position,
+                durationSeconds: b.motion ? b.motion.durationSeconds : DEFAULT_OBJECT_MOTION_SECONDS,
+              },
+            }
           : b,
+      ),
+    })),
+  setHideInExport: (id, hidden) =>
+    set((state) => ({
+      blocks: state.blocks.map((b) => {
+        if (b.id !== id) return b;
+        const copy = { ...b };
+        if (hidden) copy.hideInExport = true;
+        else delete copy.hideInExport;
+        return copy;
+      }),
+    })),
+  setMotionDuration: (id, seconds) =>
+    set((state) => ({
+      blocks: state.blocks.map((b) =>
+        b.id === id && b.motion ? { ...b, motion: { ...b.motion, durationSeconds: seconds } } : b,
       ),
     })),
   clearMotion: (id) =>

@@ -1,5 +1,11 @@
-import { KIND_LABELS, useBlockStore } from "./useBlockStore";
+import {
+  DEFAULT_OBJECT_MOTION_SECONDS,
+  KIND_LABELS,
+  OBJECT_MOTION_SECONDS_RANGE,
+  useBlockStore,
+} from "./useBlockStore";
 import { useCameraPathStore } from "./useCameraPathStore";
+import { useCameraSettingsStore } from "./useCameraSettingsStore";
 
 export function SelectionHint() {
   const focusedBlockId = useBlockStore((s) => s.focusedBlockId);
@@ -8,6 +14,11 @@ export function SelectionHint() {
   const focusBlock = useBlockStore((s) => s.focusBlock);
   const setMotionStart = useBlockStore((s) => s.setMotionStart);
   const setMotionEnd = useBlockStore((s) => s.setMotionEnd);
+  const setMotionDuration = useBlockStore((s) => s.setMotionDuration);
+  const setHideInExport = useBlockStore((s) => s.setHideInExport);
+  const focusBlockId = useCameraSettingsStore((s) => s.focusBlockId);
+  const setFocusBlockId = useCameraSettingsStore((s) => s.setFocusBlockId);
+  const setDofEnabled = useCameraSettingsStore((s) => s.setDofEnabled);
   const clearMotion = useBlockStore((s) => s.clearMotion);
   const isRecording = useCameraPathStore((s) => s.isRecording);
   const isPlaying = useCameraPathStore((s) => s.isPlaying);
@@ -16,6 +27,7 @@ export function SelectionHint() {
 
   const busy = isRecording || isPlaying;
   const hasMotion = Boolean(block.motion);
+  const isFocusTarget = focusBlockId === block.id;
 
   return (
     <div className="panel">
@@ -35,15 +47,58 @@ export function SelectionHint() {
         </button>
       </div>
       {hasMotion && (
-        <div className="panel__row">
-          <button type="button" onClick={() => clearMotion(block.id)} disabled={busy}>
-            움직임 지우기
-          </button>
-        </div>
+        <>
+          <label className="panel__field">
+            {block.motion?.durationSeconds !== undefined
+              ? `이동 시간: ${block.motion.durationSeconds.toFixed(1)}초`
+              : "이동 시간: 카메라 전체 시간"}
+            <input
+              type="range"
+              min={OBJECT_MOTION_SECONDS_RANGE.min}
+              max={OBJECT_MOTION_SECONDS_RANGE.max}
+              step={0.5}
+              value={block.motion?.durationSeconds ?? DEFAULT_OBJECT_MOTION_SECONDS}
+              disabled={busy}
+              onChange={(e) => setMotionDuration(block.id, Number(e.target.value))}
+            />
+          </label>
+          <div className="panel__row">
+            <button type="button" onClick={() => clearMotion(block.id)} disabled={busy}>
+              움직임 지우기
+            </button>
+          </div>
+        </>
       )}
       <p className="panel__hint">
-        {hasMotion ? "무빙 설정됨 — 경로 재생 시 같이 움직입니다" : "아직 무빙이 설정되지 않았어요"}
+        {hasMotion
+          ? "재생 시작과 동시에 한 번 이동하고, 끝 위치에서 멈춰요"
+          : "아직 무빙이 설정되지 않았어요"}
       </p>
+
+      <div className="panel__row">
+        <button
+          type="button"
+          onClick={() => {
+            if (isFocusTarget) {
+              setFocusBlockId(null);
+            } else {
+              setFocusBlockId(block.id);
+              setDofEnabled(true);
+            }
+          }}
+        >
+          {isFocusTarget ? "초점 해제" : "이 오브젝트에 초점"}
+        </button>
+      </div>
+
+      <label className="panel__check">
+        <input
+          type="checkbox"
+          checked={Boolean(block.hideInExport)}
+          onChange={(e) => setHideInExport(block.id, e.target.checked)}
+        />
+        가이드 영상에서 제외 (에디터에서는 반투명으로 보여요)
+      </label>
 
       <div className="panel__row">
         <button type="button" onClick={() => removeBlock(block.id)}>

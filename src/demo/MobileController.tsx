@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { joinPhoneSession, sendOrientation } from "./phoneSession";
+import { PhoneViewfinder } from "./PhoneViewfinder";
 
 const SEND_INTERVAL_MS = 50;
 
@@ -62,7 +63,7 @@ export function MobileController({ sessionId }: { sessionId: string }) {
   };
 
   return (
-    <div className="mobile-controller">
+    <div className={`mobile-controller${status === "connected" ? " mobile-controller--active" : ""}`}>
       <h1>레고 카메라 스튜디오</h1>
       <p className="mobile-controller__code">코드: {sessionId}</p>
 
@@ -84,12 +85,13 @@ export function MobileController({ sessionId }: { sessionId: string }) {
       )}
 
       {status === "connected" && (
-        <div className="mobile-controller__readout">
-          <p>✅ 연결됨 — 폰을 움직여서 카메라 시점을 잡아보세요</p>
-          <p>α (방향): {angles.alpha.toFixed(0)}°</p>
-          <p>β (앞뒤 기울기): {angles.beta.toFixed(0)}°</p>
-          <p>γ (좌우 기울기): {angles.gamma.toFixed(0)}°</p>
-        </div>
+        <>
+          <p className="mobile-controller__hint">✅ 연결됨 — 폰을 움직여서 카메라 시점을 잡아보세요</p>
+          <PhoneViewfinder sessionId={sessionId} />
+          <div className="mobile-controller__readout">
+            <p>α: {angles.alpha.toFixed(0)}° · β: {angles.beta.toFixed(0)}° · γ: {angles.gamma.toFixed(0)}°</p>
+          </div>
+        </>
       )}
     </div>
   );

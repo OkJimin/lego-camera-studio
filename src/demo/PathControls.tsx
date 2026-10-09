@@ -1,4 +1,5 @@
 import { AUTO_MOVE_DURATION_RANGE, useCameraPathStore } from "./useCameraPathStore";
+import { useGuideExportStore } from "./useGuideExportStore";
 
 export function PathControls() {
   const isRecording = useCameraPathStore((s) => s.isRecording);
@@ -18,6 +19,7 @@ export function PathControls() {
   const requestSaveEnd = useCameraPathStore((s) => s.requestSaveEnd);
   const requestGoEnd = useCameraPathStore((s) => s.requestGoEnd);
   const generatePath = useCameraPathStore((s) => s.generatePath);
+  const openExport = useGuideExportStore((s) => s.openExport);
 
   const busy = isRecording || isPlaying;
 
@@ -87,6 +89,12 @@ export function PathControls() {
       </div>
 
       <p className="panel__hint">키프레임: {keyframeCount}개</p>
+
+      <div className="panel__row">
+        <button type="button" onClick={openExport} disabled={busy || keyframeCount < 2}>
+          가이드 영상 내보내기
+        </button>
+      </div>
     </div>
   );
 }

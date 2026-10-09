@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import * as THREE from "three";
+import { deserializeKeyframes, resampleToUniform } from "./guidePath";
 
 const SAMPLE_INTERVAL_SECONDS = 0.03;
 export const AUTO_MOVE_DURATION_RANGE = { min: 1, max: 20 };
@@ -10,6 +11,21 @@ export interface CameraKeyframe {
   quaternion: THREE.Quaternion;
   fov: number;
   time: number;
+}
+
+// Keyframes are sampled whenever a frame happens to render, so their spacing in
+// time wobbles — but playback treats them as evenly spaced, which shows up as
+// uneven speed. Re-space them evenly in time once a recording ends.
+export function toUniformKeyframes(keyframes: CameraKeyframe[]): CameraKeyframe[] {
+  const path = resampleToUniform(
+    keyframes.map((k) => ({
+      t: k.time,
+      p: [k.position.x, k.position.y, k.position.z],
+      q: [k.quaternion.x, k.quaternion.y, k.quaternion.z, k.quaternion.w],
+      fov: k.fov,
+    })),
+  );
+  return path ? deserializeKeyframes(path) : keyframes;
 }
 
 export type PendingCameraAction = "save-home" | "go-home" | "save-end" | "go-end" | null;
@@ -74,7 +90,8 @@ export const useCameraPathStore = create<CameraPathState>((set, get) => ({
       lastSampleTime: 0,
       recordStartTime: null,
     }),
-  stopRecording: () => set({ isRecording: false }),
+  stopRecording: () =>
+    set((state) => ({ isRecording: false, keyframes: toUniformKeyframes(state.keyframes) })),
   addKeyframe: (position, quaternion, fov, now) => {
     const { lastSampleTime, recordStartTime } = get();
     if (now - lastSampleTime < SAMPLE_INTERVAL_SECONDS) return;
