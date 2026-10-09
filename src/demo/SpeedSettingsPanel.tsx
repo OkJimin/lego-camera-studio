@@ -1,6 +1,5 @@
 import {
   MOVE_SPEED_RANGE,
-  OBJECT_MOTION_SECONDS_RANGE,
   TILT_PAN_SPEED_RANGE,
   ZOOM_SPEED_RANGE,
   useSpeedSettingsStore,
@@ -14,12 +13,10 @@ export function SpeedSettingsPanel({ showTiltPan = true }: { showTiltPan?: boole
   const zoomSpeed = useSpeedSettingsStore((s) => s.zoomSpeed);
   const tiltSpeed = useSpeedSettingsStore((s) => s.tiltSpeed);
   const panSpeed = useSpeedSettingsStore((s) => s.panSpeed);
-  const objectMotionSeconds = useSpeedSettingsStore((s) => s.objectMotionSeconds);
   const setMoveSpeed = useSpeedSettingsStore((s) => s.setMoveSpeed);
   const setZoomSpeed = useSpeedSettingsStore((s) => s.setZoomSpeed);
   const setTiltSpeed = useSpeedSettingsStore((s) => s.setTiltSpeed);
   const setPanSpeed = useSpeedSettingsStore((s) => s.setPanSpeed);
-  const setObjectMotionSeconds = useSpeedSettingsStore((s) => s.setObjectMotionSeconds);
 
   return (
     <div className="panel">
@@ -77,17 +74,7 @@ export function SpeedSettingsPanel({ showTiltPan = true }: { showTiltPan?: boole
         </>
       )}
 
-      <label className="panel__field">
-        오브젝트 이동 속도 (한 방향 {objectMotionSeconds.toFixed(1)}초)
-        <input
-          type="range"
-          min={OBJECT_MOTION_SECONDS_RANGE.min}
-          max={OBJECT_MOTION_SECONDS_RANGE.max}
-          step={0.5}
-          value={objectMotionSeconds}
-          onChange={(e) => setObjectMotionSeconds(Number(e.target.value))}
-        />
-      </label>
+      <p className="panel__hint">오브젝트 이동 시간은 오브젝트를 선택해서 따로 정해요</p>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import {
+  clearRecordedPath,
   forgetPhoneSession,
   getOrCreatePhoneSession,
   mobileSessionUrl,
@@ -8,16 +9,19 @@ import {
   syncCameraPath,
   syncCameraSettings,
   syncHomePosition,
+  syncHomeYaw,
   syncLighting,
   syncSpeedSettings,
   watchOrientation,
   watchPhoneConnected,
+  watchRecordedPath,
 } from "./phoneSession";
 import type { PhoneOrientation } from "./phoneSession";
-import { serializeKeyframes } from "./guidePath";
-import { liveCameraPose } from "./liveCameraPose";
+import { deserializeKeyframes, serializeKeyframes } from "./guidePath";
+import { headingFromQuaternion, liveCameraPose } from "./liveCameraPose";
 import { useBlockStore } from "./useBlockStore";
 import { useCameraPathStore } from "./useCameraPathStore";
+import { useGuideExportStore } from "./useGuideExportStore";
 import { FORMAT_PRESETS, useCameraSettingsStore } from "./useCameraSettingsStore";
 import { useLightingStore } from "./useLightingStore";
 import { useSpeedSettingsStore } from "./useSpeedSettingsStore";
@@ -28,11 +32,15 @@ const HOME_POSITION_SYNC_INTERVAL_MS = 150;
 export function PhonePairingPanel() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
-  const [captureQrDataUrl, setCaptureQrDataUrl] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [orientation, setOrientation] = useState<PhoneOrientation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [receivedSeconds, setReceivedSeconds] = useState<number | null>(null);
+  const isPlaying = useCameraPathStore((s) => s.isPlaying);
+  const play = useCameraPathStore((s) => s.play);
+  const stopPlayback = useCameraPathStore((s) => s.stop);
+  const openExport = useGuideExportStore((s) => s.openExport);
 
   const setUpSession = async () => {
     setLoading(true);
@@ -40,12 +48,7 @@ export function PhonePairingPanel() {
     try {
       const id = await getOrCreatePhoneSession();
       setSessionId(id);
-      const [dataUrl, captureUrl] = await Promise.all([
-        QRCode.toDataURL(mobileSessionUrl(id), { width: 220, margin: 1 }),
-        QRCode.toDataURL(mobileSessionUrl(id, "capture"), { width: 220, margin: 1 }),
-      ]);
-      setQrDataUrl(dataUrl);
-      setCaptureQrDataUrl(captureUrl);
+      setQrDataUrl(await QRCode.toDataURL(mobileSessionUrl(id), { width: 220, margin: 1 }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "연결 생성에 실패했어요");
     } finally {
@@ -111,6 +114,7 @@ export function PhonePairingPanel() {
         liveCameraPose.position.y,
         liveCameraPose.position.z,
       ]);
+      syncHomeYaw(sessionId, headingFromQuaternion(liveCameraPose.quaternion));
     }, HOME_POSITION_SYNC_INTERVAL_MS);
     return () => clearInterval(id);
   }, [sessionId]);
@@ -129,6 +133,31 @@ export function PhonePairingPanel() {
         pushPath(state);
       }
     });
+  }, [sessionId]);
+
+  // The path the phone records with its gyro becomes this project's camera path,
+  // so it can be previewed, saved and exported like one recorded on the desktop.
+  useEffect(() => {
+    if (!sessionId) return;
+    let cancelled = false;
+    let unsubscribe = () => {};
+    clearRecordedPath(sessionId)
+      .catch(() => {})
+      .then(() => {
+        if (cancelled) return;
+        unsubscribe = watchRecordedPath(sessionId, (path) => {
+          useCameraPathStore.setState({
+            keyframes: deserializeKeyframes(path),
+            isPlaying: false,
+            isRecording: false,
+          });
+          setReceivedSeconds(path.duration);
+        });
+      });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, [sessionId]);
 
   // Mirror lens/format so the phone's viewfinder frames the shot the same
@@ -160,7 +189,7 @@ export function PhonePairingPanel() {
     return useLightingStore.subscribe(pushLighting);
   }, [sessionId]);
 
-  // Mirror movement/zoom/object-loop speed so the "움직임 속도" sliders tune
+  // Mirror movement/zoom speed so the "움직임 속도" sliders tune
   // the phone's own live canvas, which runs in a separate browser process.
   useEffect(() => {
     if (!sessionId) return;
@@ -170,7 +199,6 @@ export function PhonePairingPanel() {
         zoomSpeed: state.zoomSpeed,
         tiltSpeed: state.tiltSpeed,
         panSpeed: state.panSpeed,
-        objectMotionSeconds: state.objectMotionSeconds,
       });
     };
     pushSpeed(useSpeedSettingsStore.getState());
@@ -193,6 +221,26 @@ export function PhonePairingPanel() {
           <p className="panel__hint">
             {connected ? "✅ 폰이 연결됐습니다" : "폰에서 아래 QR 코드를 스캔해주세요"}
           </p>
+          {connected && (
+            <p className="panel__hint">
+              폰 화면 오른쪽 위의 "녹화 시작"으로 카메라 무빙을 기록하세요
+            </p>
+          )}
+          {receivedSeconds !== null && (
+            <>
+              <p className="panel__hint">
+                ✅ 폰에서 받은 경로: {receivedSeconds.toFixed(1)}초 — 아래 버튼으로 영상 파일을 받으세요
+              </p>
+              <div className="panel__row">
+                <button type="button" onClick={() => (isPlaying ? stopPlayback() : play())}>
+                  {isPlaying ? "재생 중지" : "경로 미리보기"}
+                </button>
+                <button type="button" onClick={openExport} disabled={isPlaying}>
+                  가이드 영상 내보내기
+                </button>
+              </div>
+            </>
+          )}
           {qrDataUrl && !connected && (
             <>
               <img src={qrDataUrl} alt="연결 QR 코드" width={180} height={180} />
@@ -202,10 +250,9 @@ export function PhonePairingPanel() {
               </p>
             </>
           )}
-          <p className="panel__hint">촬영 모드 (반투명 가이드 위에서 촬영): 아래 QR을 스캔하세요</p>
-          {captureQrDataUrl && (
-            <img src={captureQrDataUrl} alt="촬영 모드 QR 코드" width={180} height={180} />
-          )}
+          <p className="panel__hint">
+            가이드 영상을 보며 촬영하려면 시작 화면의 "폰으로 가이드 촬영하기"를 이용하세요
+          </p>
           <p className="panel__hint">코드: {sessionId}</p>
 
           {connected && orientation && (

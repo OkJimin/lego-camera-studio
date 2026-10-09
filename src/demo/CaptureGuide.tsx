@@ -61,9 +61,11 @@ export function CaptureGuide({
     <>
       <ambientLight intensity={0.8} />
       <directionalLight position={[6, 12, 8]} intensity={0.9} />
-      {blocks.map((block) => (
-        <Block key={block.id} block={block} interactive={false} />
-      ))}
+      {blocks
+        .filter((block) => !block.hideInExport)
+        .map((block) => (
+          <Block key={block.id} block={block} interactive={false} />
+        ))}
     </>
   );
 }

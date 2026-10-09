@@ -1,6 +1,8 @@
 import { BlockPalette } from "./BlockPalette";
-import { CameraMonitor } from "./CameraMonitor";
 import { CameraSettingsPanel } from "./CameraSettingsPanel";
+import { FrameGuide } from "./FrameGuide";
+import { GuideExporter } from "./GuideExporter";
+import { GuideExportPanel } from "./GuideExportPanel";
 import { LightingPanel } from "./LightingPanel";
 import { PathControls } from "./PathControls";
 import { Scene } from "./Scene";
@@ -26,17 +28,19 @@ export function WebWorkspace() {
         <BlockPalette />
         <PathControls />
       </div>
-      <CameraMonitor />
+      <FrameGuide />
       <div className="right-rail">
         <SelectionHint />
         <SettingsDrawer>
           <SaveAccountPanel />
+          <GuideExportPanel />
           <LightingPanel />
           <CameraSettingsPanel />
           <SpeedSettingsPanel />
           <ShotButtons />
         </SettingsDrawer>
       </div>
+      <GuideExporter />
     </div>
   );
 }

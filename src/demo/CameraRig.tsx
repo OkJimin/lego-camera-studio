@@ -10,6 +10,7 @@ import { useHeldMoveKeys } from "./useHeldMoveKeys";
 import { shotActionState } from "./shotActions";
 import { liveCameraPose } from "./liveCameraPose";
 import { playbackClock } from "./playbackClock";
+import { useCameraSettingsStore } from "./useCameraSettingsStore";
 import { useSpeedSettingsStore } from "./useSpeedSettingsStore";
 
 const MIN_FOV = 10;
@@ -20,6 +21,7 @@ const WORLD_UP = new THREE.Vector3(0, 1, 0);
 const _forward = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _move = new THREE.Vector3();
+const _subject = new THREE.Vector3();
 
 type OrbitControlsInstance = ComponentRef<typeof OrbitControls>;
 
@@ -104,8 +106,27 @@ export function CameraRig() {
   useEffect(() => {
     if (pendingFov !== null) {
       const persp = camera as THREE.PerspectiveCamera;
+
+      // Keep the focus object the same size on screen by sliding the camera along
+      // the line to it. A longer lens then sits farther back, which flattens the
+      // perspective — the visible difference between lenses.
+      const { keepSubjectSize, focusBlockId } = useCameraSettingsStore.getState();
+      const subject = keepSubjectSize
+        ? useBlockStore.getState().blocks.find((b) => b.id === focusBlockId)
+        : undefined;
+      if (subject) {
+        const scale =
+          Math.tan(THREE.MathUtils.degToRad(persp.fov / 2)) /
+          Math.tan(THREE.MathUtils.degToRad(pendingFov / 2));
+        _subject.set(...subject.position);
+        _move.copy(persp.position).sub(_subject).multiplyScalar(scale - 1);
+        persp.position.add(_move);
+        orbitRef.current?.target.add(_move);
+      }
+
       persp.fov = pendingFov;
       persp.updateProjectionMatrix();
+      orbitRef.current?.update();
       clearPendingFov();
     }
   }, [pendingFov, camera, clearPendingFov]);

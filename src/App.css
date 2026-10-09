@@ -107,6 +107,14 @@ body,
   color: #555;
 }
 
+.panel__check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  margin: 0.4rem 0;
+}
+
 .panel__field {
   display: flex;
   flex-direction: column;
@@ -161,45 +169,53 @@ button {
   cursor: pointer;
 }
 
-.monitor {
+.aspect-host {
   position: absolute;
-  bottom: 1rem;
-  left: 1rem;
-  z-index: 15;
+  inset: 0;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.3rem;
-  pointer-events: none;
+  align-items: center;
+  justify-content: center;
+  container-type: size;
 }
 
-.monitor__label {
-  margin: 0;
-  font-size: 0.75rem;
-  color: #333;
-  background: rgba(255, 255, 255, 0.85);
-  padding: 0.1rem 0.6rem;
-  border-radius: 6px;
-}
-
-.monitor__frame {
+.aspect-frame {
   position: relative;
-  width: 280px;
-  aspect-ratio: 16 / 9;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-  border: 2px solid rgba(255, 255, 255, 0.8);
+  width: min(100cqw, calc(100cqh * var(--frame-aspect)));
+  height: min(100cqh, calc(100cqw / var(--frame-aspect)));
 }
 
-.monitor__frame canvas {
-  pointer-events: none;
+.aspect-frame > div {
+  position: absolute !important;
+  inset: 0;
 }
 
 .aspect-mask {
   position: absolute;
   inset: 0;
   pointer-events: none;
+}
+
+.frame-guide-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.frame-guide {
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  /* The shadow spreads over everything outside the frame, dimming it. */
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.28);
+}
+
+.frame-guide__label {
+  position: absolute;
+  top: 0.3rem;
+  left: 0.4rem;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
 }
 
 .aspect-mask__bar {
@@ -219,7 +235,9 @@ button {
 
 .start-screen {
   width: 100vw;
-  height: 100vh;
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 2rem 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -293,12 +311,119 @@ button {
 }
 
 .start-screen__project-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
   border: 1px solid #ddd;
   border-radius: 8px;
   background: white;
   padding: 0.5rem 0.8rem;
   cursor: pointer;
   text-align: left;
+  font-size: 0.85rem;
+}
+
+.start-screen__project-item:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.start-screen__project-meta {
+  font-size: 0.72rem;
+  color: #777;
+}
+
+.start-screen__primary {
+  margin-top: 1rem;
+  padding: 0.6rem 1.6rem;
+  border: none;
+  border-radius: 8px;
+  background: #2a5cd9;
+  color: white;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.start-screen__secondary {
+  margin: 0.6rem 0 0 0.5rem;
+  padding: 0.6rem 1.2rem;
+  border: 1px solid #bbb;
+  border-radius: 8px;
+  background: white;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.start-screen__shoot {
+  margin: 1rem auto 0;
+  max-width: 320px;
+  padding: 0.8rem;
+  border-radius: 10px;
+  background: white;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.shoot-qr {
+  text-align: center;
+}
+
+.shoot-qr__url {
+  margin: 0.3rem 0 0;
+  font-size: 0.7rem;
+  color: #777;
+  word-break: break-all;
+}
+
+.shoot-qr__warning {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  color: #c0392b;
+}
+
+.start-screen__section {
+  margin: 1.4rem 0 0.5rem;
+  font-size: 0.95rem;
+  text-align: left;
+}
+
+.start-screen__templates {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.5rem;
+}
+
+.start-screen__template {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: white;
+  text-align: left;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.start-screen__template:hover {
+  border-color: #2a5cd9;
+}
+
+.start-screen__account {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+.start-screen__account .start-screen__link {
+  margin-top: 0;
+}
+
+.start-screen__error {
+  margin-top: 0.8rem;
+  color: #c0392b;
   font-size: 0.85rem;
 }
 
@@ -465,6 +590,154 @@ button {
   user-select: none;
 }
 
+.export-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.export-dialog {
+  max-width: 92vw;
+  padding: 1.2rem 1.4rem;
+  border-radius: 12px;
+  background: white;
+  text-align: center;
+  font-family: system-ui, sans-serif;
+}
+
+.export-dialog h2 {
+  margin: 0 0 0.8rem;
+  font-size: 1.05rem;
+}
+
+.export-dialog__viewport {
+  margin: 0 auto;
+  overflow: hidden;
+  background: #000;
+}
+
+.export-dialog__canvas {
+  transform-origin: top left;
+}
+
+.export-dialog__status {
+  margin: 0.8rem 0 0.2rem;
+  font-size: 0.9rem;
+}
+
+.export-dialog__hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #777;
+}
+
+.export-dialog__buttons {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+}
+
+.export-dialog__check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.export-dialog__next {
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+}
+
+.export-dialog__next p {
+  margin: 0 0 0.4rem;
+}
+
+.export-dialog__options {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.85rem;
+}
+
+.export-dialog__options label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: left;
+}
+
+.export-dialog__start {
+  background: #2a5cd9;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.35rem 0.9rem;
+  cursor: pointer;
+}
+
+.export-dialog__download {
+  padding: 0.35rem 0.9rem;
+  border-radius: 6px;
+  background: #2a5cd9;
+  color: white;
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+.phone-record {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.8rem;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+
+.phone-record__button {
+  padding: 0.5rem 1.2rem;
+  border: none;
+  border-radius: 999px;
+  background: #d92b2b;
+  color: white;
+  font-size: 0.9rem;
+}
+
+.phone-record__button--ghost {
+  background: rgba(255, 255, 255, 0.85);
+  color: #333;
+}
+
+.phone-record__button--stop {
+  background: #333;
+}
+
+.phone-record__badge {
+  padding: 0.2rem 0.7rem;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.phone-record__countdown {
+  font-size: 3rem;
+  font-weight: bold;
+  color: white;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
 .capture-stage {
   position: fixed;
   inset: 0;
@@ -497,6 +770,17 @@ button {
 }
 
 .capture-overlay {
+  pointer-events: none;
+}
+
+/* A guide exported from the desktop keeps its own aspect ratio, centered, which
+   lines up with the aspect mask drawn over the frame. */
+.capture-guide-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
   pointer-events: none;
 }
 
@@ -579,6 +863,18 @@ button {
   margin-right: 0.5rem;
 }
 
+.capture-bar__file {
+  display: inline-block;
+  padding: 0.8rem 1.4rem;
+  font-size: 1rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.capture-bar__file input {
+  display: none;
+}
+
 .shoot-library {
   min-height: 100vh;
   box-sizing: border-box;
@@ -595,6 +891,12 @@ button {
 .shoot-library__hint {
   color: #555;
   font-size: 0.9rem;
+}
+
+.shoot-library__divider {
+  margin: 1.4rem 0;
+  border: none;
+  border-top: 1px solid #d8d4c6;
 }
 
 .shoot-library__error {

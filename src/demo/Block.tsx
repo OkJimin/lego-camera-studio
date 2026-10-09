@@ -2,13 +2,19 @@ import { useEffect, useState } from "react";
 import * as THREE from "three";
 import { TransformControls } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { BLOCK_COLORS, ROTATION_SNAP_DEG, useBlockStore, worldHeight } from "./useBlockStore";
+import {
+  BLOCK_COLORS,
+  ROTATION_SNAP_DEG,
+  motionProgress,
+  useBlockStore,
+  worldHeight,
+} from "./useBlockStore";
 import type { PlacedBlock } from "./useBlockStore";
 import { useCameraPathStore } from "./useCameraPathStore";
 import { PersonFigure } from "./PersonFigure";
 import { useClickHandlers } from "./useClickHandlers";
 import { playbackClock } from "./playbackClock";
-import { DEFAULT_OBJECT_MOTION_SECONDS } from "./useSpeedSettingsStore";
+import type { GuideClock } from "./playbackClock";
 
 // Shared unit geometries: every block of a given kind starts at [1,1,1] and is
 // resized purely via the mesh's `scale`, so one geometry instance per kind is
@@ -16,25 +22,18 @@ import { DEFAULT_OBJECT_MOTION_SECONDS } from "./useSpeedSettingsStore";
 const BOX_GEOMETRY = new THREE.BoxGeometry(1, 1, 1);
 const SPHERE_GEOMETRY = new THREE.SphereGeometry(0.5, 24, 24);
 const CONE_GEOMETRY = new THREE.ConeGeometry(0.5, 1, 24);
-
-function triangleWave(elapsed: number, legSeconds: number) {
-  const cycle = elapsed % (legSeconds * 2);
-  return cycle < legSeconds ? cycle / legSeconds : 2 - cycle / legSeconds;
-}
+const EXCLUDED_OPACITY = 0.35;
 
 export function Block({
   block,
   interactive = true,
-  loopMotion = false,
-  loopLegSeconds = DEFAULT_OBJECT_MOTION_SECONDS,
+  clock,
 }: {
   block: PlacedBlock;
   interactive?: boolean;
-  // Animate motion as a continuous back-and-forth loop instead of following
-  // the desktop's recorded camera-path playback clock.
-  loopMotion?: boolean;
-  // One-way duration of that loop, only used when loopMotion is true.
-  loopLegSeconds?: number;
+  // Drive the object's motion from this clock instead of the desktop editor's
+  // shared playback state. Only for non-interactive canvases.
+  clock?: GuideClock;
 }) {
   const addBlock = useBlockStore((s) => s.addBlock);
   const selectedKind = useBlockStore((s) => s.selectedKind);
@@ -81,22 +80,19 @@ export function Block({
     ]);
   };
 
-  // While the camera path is playing, animate between the saved start/end
-  // pose on the same shared timeline as the camera, instead of the static position.
-  // In loopMotion mode (no recorded camera path to sync against) it just loops
-  // continuously instead, driven by the scene's own clock.
-  useFrame((state) => {
+  // While playing, move once from the saved start to the end pose (taking the
+  // object's own duration, then holding at the end) on the same timeline as the camera.
+  useFrame(() => {
     if (!block.motion || !targetObject) return;
-    let t: number;
-    if (loopMotion) {
-      t = triangleWave(state.clock.elapsedTime, loopLegSeconds);
-    } else {
-      if (!isPlaying) return;
-      t =
-        playbackClock.duration > 0
-          ? Math.min(Math.max(playbackClock.elapsed / playbackClock.duration, 0), 1)
-          : 0;
+    const playing = clock ? clock.playing : useCameraPathStore.getState().isPlaying;
+    if (!playing) {
+      // An injected clock can't trigger the isPlaying effect below, so keep the
+      // resting pose applied here (those canvases are never edited).
+      if (clock) targetObject.position.set(...block.position);
+      return;
     }
+    const source = clock ?? playbackClock;
+    const t = motionProgress(block.motion, source.elapsed, source.duration);
     const [sx, sy, sz] = block.motion.startPosition;
     const [ex, ey, ez] = block.motion.endPosition;
     targetObject.position.set(sx + (ex - sx) * t, sy + (ey - sy) * t, sz + (ez - sz) * t);
@@ -104,10 +100,10 @@ export function Block({
 
   // Once playback stops, snap back to the resting (React-driven) position.
   useEffect(() => {
-    if (!loopMotion && !isPlaying && targetObject && block.motion) {
+    if (!clock && !isPlaying && targetObject && block.motion) {
       targetObject.position.set(...block.position);
     }
-  }, [isPlaying, loopMotion]);
+  }, [isPlaying]);
 
   const sharedProps = {
     position: block.position,
@@ -117,17 +113,25 @@ export function Block({
     onPointerUp: interactive && !isBusy ? onPointerUp : undefined,
   };
 
+  // Objects left out of the exported video show faded in the editor (not in the
+  // camera monitor, which is non-interactive and shows what the shot contains).
+  const opacity = interactive && block.hideInExport ? EXCLUDED_OPACITY : 1;
+
   const shape =
     block.kind === "person" ? (
       <group ref={setTargetObject} {...sharedProps}>
-        <PersonFigure color={block.color} />
+        <PersonFigure color={block.color} opacity={opacity} />
       </group>
     ) : (
       <mesh ref={setTargetObject} {...sharedProps} castShadow receiveShadow>
         {block.kind === "sphere" && <primitive object={SPHERE_GEOMETRY} attach="geometry" />}
         {block.kind === "cone" && <primitive object={CONE_GEOMETRY} attach="geometry" />}
         {block.kind === "block" && <primitive object={BOX_GEOMETRY} attach="geometry" />}
-        <meshStandardMaterial color={BLOCK_COLORS[block.color]} />
+        <meshStandardMaterial
+          color={BLOCK_COLORS[block.color]}
+          transparent={opacity < 1}
+          opacity={opacity}
+        />
       </mesh>
     );
 

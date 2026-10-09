@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { useAuthStore } from "../store/authStore";
+import { describeAuthError, useAuthStore } from "../store/authStore";
 import { CaptureView } from "./CaptureWorkspace";
 import type { CaptureData } from "./CaptureWorkspace";
+import { DEFAULT_LENS_FOV } from "./useCameraSettingsStore";
 import { fetchProjectForShoot, useProjectStore } from "./useProjectStore";
 
 export function ShootLibrary() {
@@ -15,6 +16,8 @@ export function ShootLibrary() {
   const [selected, setSelected] = useState<CaptureData | null>(null);
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Shooting straight from a guide video file needs no account or project.
+  const [fileShoot, setFileShoot] = useState(false);
 
   const signedIn = !!user && !user.isAnonymous;
 
@@ -25,7 +28,7 @@ export function ShootLibrary() {
 
   const handleLogin = () => {
     setError(null);
-    signInWithGoogle().catch(() => setError("로그인에 실패했어요. 다시 시도해주세요"));
+    signInWithGoogle().catch((err) => setError(describeAuthError(err)));
   };
 
   const handleOpen = async (id: string) => {
@@ -44,6 +47,10 @@ export function ShootLibrary() {
       setOpeningId(null);
     }
   };
+
+  if (fileShoot) {
+    return <CaptureView blocks={[]} path={null} fov={DEFAULT_LENS_FOV} onBack={() => setFileShoot(false)} />;
+  }
 
   if (authLoading) {
     return (
@@ -64,7 +71,18 @@ export function ShootLibrary() {
         <p className="shoot-library__hint">
           데스크톱에서 저장한 프로젝트를 보려면 같은 구글 계정으로 로그인하세요.
         </p>
-        <button type="button" className="shoot-library__primary" onClick={handleLogin}>
+        <button type="button" className="shoot-library__primary" onClick={() => setFileShoot(true)}>
+          가이드 영상으로 촬영
+        </button>
+        <p className="shoot-library__hint">
+          노트북에서 내보낸 가이드 영상(mp4)을 폰에 저장해둔 뒤, 영상을 고르면 카메라 위에
+          반투명하게 겹쳐서 촬영할 수 있어요. 로그인은 필요 없어요
+        </p>
+        <hr className="shoot-library__divider" />
+        <p className="shoot-library__hint">
+          영상 파일 없이, 저장한 프로젝트의 3D 가이드로 촬영하려면 로그인하세요
+        </p>
+        <button type="button" className="shoot-library__item" onClick={handleLogin}>
           구글로 로그인
         </button>
         {error && <p className="shoot-library__error">{error}</p>}
@@ -74,7 +92,12 @@ export function ShootLibrary() {
 
   return (
     <div className="shoot-library">
-      <h1>프로젝트 선택</h1>
+      <h1>폰으로 가이드 촬영</h1>
+      <button type="button" className="shoot-library__primary" onClick={() => setFileShoot(true)}>
+        가이드 영상으로 촬영
+      </button>
+      <hr className="shoot-library__divider" />
+      <p className="shoot-library__hint">또는 저장한 프로젝트의 3D 가이드로 촬영</p>
       {error && <p className="shoot-library__error">{error}</p>}
       {isLoadingList && <p className="shoot-library__hint">목록 불러오는 중...</p>}
       {!isLoadingList && myProjects.length === 0 && (

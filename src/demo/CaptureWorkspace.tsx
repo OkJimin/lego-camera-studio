@@ -1,22 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { Canvas } from "@react-three/fiber";
+import { AspectFrame } from "./AspectFrame";
 import { AspectMask } from "./AspectMask";
+import { FORMAT_PRESETS } from "./useCameraSettingsStore";
 import { CaptureGuide } from "./CaptureGuide";
 import type { CameraPathSync } from "./guidePath";
 import { ensureAnonymousAuth, watchBlocks, watchCameraPath, watchCameraSettings } from "./phoneSession";
 import type { CameraSettingsSync } from "./phoneSession";
+import { extensionForMimeType, pickRecordingMimeType, triggerDownload } from "./recording";
 import type { PlacedBlock } from "./useBlockStore";
 
 type CaptureStatus = "idle" | "countdown" | "recording" | "saved";
 
 const COUNTDOWN_START = 3;
 const RECORDING_BITRATE = 20_000_000;
-
-function pickRecordingMimeType(): string {
-  const candidates = ["video/mp4", "video/webm;codecs=vp9", "video/webm"];
-  return candidates.find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
-}
 
 export interface CaptureData {
   blocks: PlacedBlock[];
@@ -68,6 +66,7 @@ export function CaptureView({
   onBack,
 }: CaptureData & { onBack?: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const guideVideoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -78,6 +77,22 @@ export function CaptureView({
   const [frameAspect, setFrameAspect] = useState<number | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [savedUrl, setSavedUrl] = useState<string | null>(null);
+  // A guide video exported from the desktop, picked from this phone's files.
+  // When present it replaces the 3D guide.
+  const [guideUrl, setGuideUrl] = useState<string | null>(null);
+  const [guideAspect, setGuideAspect] = useState<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (guideUrl) URL.revokeObjectURL(guideUrl);
+    };
+  }, [guideUrl]);
+
+  const handlePickGuide = (file: File | undefined) => {
+    if (!file) return;
+    setGuideAspect(null);
+    setGuideUrl(URL.createObjectURL(file));
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -121,6 +136,7 @@ export function CaptureView({
   const stopRecording = useCallback(() => {
     const recorder = recorderRef.current;
     if (recorder && recorder.state !== "inactive") recorder.stop();
+    guideVideoRef.current?.pause();
   }, []);
 
   const startRecording = () => {
@@ -140,16 +156,19 @@ export function CaptureView({
       const type = recorder.mimeType || mimeType || "video/webm";
       const blob = new Blob(chunksRef.current, { type });
       const url = URL.createObjectURL(blob);
-      const extension = type.includes("mp4") ? "mp4" : "webm";
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `lego-guide-${Date.now()}.${extension}`;
-      link.click();
+      triggerDownload(url, `lego-shot-${Date.now()}.${extensionForMimeType(type)}`);
       setSavedUrl(url);
       setStatus("saved");
     };
     recorderRef.current = recorder;
     recorder.start();
+
+    // Start the guide video on the same beat as the recording.
+    const guideVideo = guideVideoRef.current;
+    if (guideVideo) {
+      guideVideo.currentTime = 0;
+      guideVideo.play().catch(() => {});
+    }
     setStatus("recording");
   };
 
@@ -175,6 +194,7 @@ export function CaptureView({
   };
 
   const hasPath = path !== null && path.keys.length >= 2;
+  const hasGuide = hasPath || guideUrl !== null;
 
   return (
     <div className="capture-stage">
@@ -192,34 +212,52 @@ export function CaptureView({
           onResize={(e) => setFrameAspect(e.currentTarget.videoWidth / e.currentTarget.videoHeight)}
         />
 
-        <div className="capture-overlay" style={{ opacity }}>
-          <Canvas
-            gl={{ alpha: true, antialias: true }}
-            camera={{ position: [0, 2, 6], fov }}
-            onCreated={({ gl }) => gl.setClearColor(0x000000, 0)}
-          >
-            <CaptureGuide
-              path={path}
-              blocks={blocks}
-              running={status === "recording"}
-              onFinished={stopRecording}
-            />
-          </Canvas>
-        </div>
+        {guideUrl ? (
+          <video
+            ref={guideVideoRef}
+            className="capture-guide-video"
+            style={{ opacity }}
+            src={guideUrl}
+            muted
+            playsInline
+            preload="auto"
+            onLoadedMetadata={(e) =>
+              setGuideAspect(e.currentTarget.videoWidth / e.currentTarget.videoHeight)
+            }
+            onEnded={stopRecording}
+          />
+        ) : (
+          <div className="capture-overlay" style={{ opacity }}>
+            <AspectFrame aspect={aspect ?? FORMAT_PRESETS[0].aspect} background="transparent">
+              <Canvas
+                gl={{ alpha: true, antialias: true }}
+                camera={{ position: [0, 2, 6], fov }}
+                onCreated={({ gl }) => gl.setClearColor(0x000000, 0)}
+              >
+                <CaptureGuide
+                  path={path}
+                  blocks={blocks}
+                  running={status === "recording"}
+                  onFinished={stopRecording}
+                />
+              </Canvas>
+            </AspectFrame>
+          </div>
+        )}
 
-        <AspectMask aspectOverride={aspect} />
+        <AspectMask aspectOverride={guideAspect ?? aspect} />
       </div>
 
       {status === "countdown" && <div className="capture-countdown">{countdown}</div>}
 
       <div className="capture-bar">
         {cameraError && <p className="capture-bar__message">{cameraError}</p>}
-        {!cameraError && !hasPath && (
+        {!cameraError && !hasGuide && (
           <p className="capture-bar__message">
-            카메라 경로가 없어요. 데스크톱에서 카메라 경로를 녹화한 뒤 다시 연결해주세요
+            가이드 영상을 선택하거나, 데스크톱에서 카메라 경로를 녹화한 뒤 다시 연결해주세요
           </p>
         )}
-        {!cameraError && hasPath && status === "idle" && (
+        {!cameraError && hasGuide && status === "idle" && (
           <p className="capture-bar__message">시작 자세에 폰을 맞춘 뒤 촬영을 누르세요</p>
         )}
         {status === "recording" && <p className="capture-bar__message">촬영 중 · 가이드를 따라가세요</p>}
@@ -248,7 +286,20 @@ export function CaptureView({
             </button>
           )}
           {status === "idle" && (
-            <button type="button" disabled={!hasPath || !!cameraError} onClick={beginCountdown}>
+            <label className="capture-bar__secondary capture-bar__file">
+              {guideUrl ? "영상 바꾸기" : "가이드 영상 선택"}
+              <input
+                type="file"
+                accept="video/*"
+                onChange={(e) => {
+                  handlePickGuide(e.target.files?.[0]);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          )}
+          {status === "idle" && (
+            <button type="button" disabled={!hasGuide || !!cameraError} onClick={beginCountdown}>
               촬영 시작
             </button>
           )}

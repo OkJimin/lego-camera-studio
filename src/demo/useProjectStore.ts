@@ -19,15 +19,30 @@ import type { CameraPathSync } from "./guidePath";
 import { useBlockStore } from "./useBlockStore";
 import type { PlacedBlock } from "./useBlockStore";
 import { DEFAULT_AUTO_MOVE_DURATION, useCameraPathStore } from "./useCameraPathStore";
-import { DEFAULT_LENS_FOV, FORMAT_PRESETS, useCameraSettingsStore } from "./useCameraSettingsStore";
+import {
+  DEFAULT_DOF_SETTINGS,
+  DEFAULT_LENS_FOV,
+  FORMAT_PRESETS,
+  useCameraSettingsStore,
+} from "./useCameraSettingsStore";
+import type { DepthOfFieldSettings } from "./useCameraSettingsStore";
 import { DEFAULT_LIGHTING, useLightingStore } from "./useLightingStore";
 import type { LightingSettings } from "./useLightingStore";
 import { DEFAULT_SPEED_SETTINGS, useSpeedSettingsStore } from "./useSpeedSettingsStore";
 import type { SpeedSettings } from "./useSpeedSettingsStore";
+import { useWorkflowStore } from "./useWorkflowStore";
+
+export type ProjectMode = "web" | "phone-setup";
 
 export interface ProjectSummary {
   id: string;
   name: string;
+  mode: ProjectMode;
+  updatedAtMs: number;
+}
+
+function readMode(value: unknown): ProjectMode {
+  return value === "phone-setup" ? "phone-setup" : "web";
 }
 
 const DEFAULT_PROJECT_NAME = "이름 없는 프로젝트";
@@ -68,7 +83,7 @@ interface ProjectState {
   setCurrentProjectName: (name: string) => void;
   saveProject: () => Promise<void>;
   fetchMyProjects: () => Promise<void>;
-  loadProject: (id: string) => Promise<void>;
+  loadProject: (id: string) => Promise<ProjectMode | null>;
   startNewProject: () => void;
 }
 
@@ -80,8 +95,26 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   myProjects: [],
   lastSavedAt: null,
   setCurrentProjectName: (name) => set({ currentProjectName: name }),
-  startNewProject: () =>
-    set({ currentProjectId: null, currentProjectName: DEFAULT_PROJECT_NAME, lastSavedAt: null }),
+  startNewProject: () => {
+    // Reset every editor store so a new project doesn't inherit the previous one's scene.
+    useBlockStore.setState({ blocks: [], history: [], focusedBlockId: null });
+    useCameraPathStore.setState({
+      home: null,
+      end: null,
+      keyframes: [],
+      autoMoveDuration: DEFAULT_AUTO_MOVE_DURATION,
+      isPlaying: false,
+      isRecording: false,
+    });
+    useCameraSettingsStore.setState({
+      lensFov: DEFAULT_LENS_FOV,
+      formatIndex: 0,
+      ...DEFAULT_DOF_SETTINGS,
+    });
+    useSpeedSettingsStore.setState({ ...DEFAULT_SPEED_SETTINGS });
+    useLightingStore.setState({ ...DEFAULT_LIGHTING });
+    set({ currentProjectId: null, currentProjectName: DEFAULT_PROJECT_NAME, lastSavedAt: null });
+  },
   saveProject: async () => {
     const uid = await ensureSignedInUid();
     if (!uid) return;
@@ -98,6 +131,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const data = {
         ownerId: uid,
         name: currentProjectName,
+        mode: useWorkflowStore.getState().mode === "phone-setup" ? "phone-setup" : "web",
         updatedAt: serverTimestamp(),
         blocks: blocks as unknown as Record<string, unknown>[],
         cameraHome: serializePose(home),
@@ -107,13 +141,17 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         lens: {
           fov: cameraSettings.lensFov,
           formatIndex: cameraSettings.formatIndex,
+          dofEnabled: cameraSettings.dofEnabled,
+          blurStrength: cameraSettings.blurStrength,
+          focusBlockId: cameraSettings.focusBlockId,
+          focusDistance: cameraSettings.focusDistance,
+          keepSubjectSize: cameraSettings.keepSubjectSize,
         },
         speed: {
           moveSpeed: speed.moveSpeed,
           zoomSpeed: speed.zoomSpeed,
           tiltSpeed: speed.tiltSpeed,
           panSpeed: speed.panSpeed,
-          objectMotionSeconds: speed.objectMotionSeconds,
         } satisfies SpeedSettings,
         lighting: {
           ambientPercent: lighting.ambientPercent,
@@ -146,10 +184,18 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     try {
       const q = query(collection(firestore, "projects"), where("ownerId", "==", uid));
       const snapshot = await getDocs(q);
-      const projects: ProjectSummary[] = snapshot.docs.map((d) => ({
-        id: d.id,
-        name: typeof d.data().name === "string" ? d.data().name : DEFAULT_PROJECT_NAME,
-      }));
+      const projects: ProjectSummary[] = snapshot.docs
+        .map((d) => {
+          const data = d.data();
+          const updatedAt = data.updatedAt as { toMillis?: () => number } | undefined;
+          return {
+            id: d.id,
+            name: typeof data.name === "string" ? data.name : DEFAULT_PROJECT_NAME,
+            mode: readMode(data.mode),
+            updatedAtMs: updatedAt?.toMillis?.() ?? 0,
+          };
+        })
+        .sort((a, b) => b.updatedAtMs - a.updatedAtMs);
       set({ myProjects: projects });
     } finally {
       set({ isLoadingList: false });
@@ -157,7 +203,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
   loadProject: async (id) => {
     const snapshot = await getDoc(doc(firestore, "projects", id));
-    if (!snapshot.exists()) return;
+    if (!snapshot.exists()) return null;
     const data = snapshot.data();
 
     useBlockStore.setState({
@@ -178,15 +224,24 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       isRecording: false,
     });
 
-    const lens = (data.lens ?? {}) as { fov?: number; formatIndex?: number };
+    const lens = (data.lens ?? {}) as { fov?: number; formatIndex?: number } & Partial<DepthOfFieldSettings>;
     useCameraSettingsStore.setState({
       lensFov: typeof lens.fov === "number" ? lens.fov : DEFAULT_LENS_FOV,
       formatIndex: typeof lens.formatIndex === "number" ? lens.formatIndex : 0,
+      // Projects saved before depth of field existed load with it off.
+      dofEnabled: lens.dofEnabled ?? DEFAULT_DOF_SETTINGS.dofEnabled,
+      blurStrength: lens.blurStrength ?? DEFAULT_DOF_SETTINGS.blurStrength,
+      focusBlockId: lens.focusBlockId ?? null,
+      focusDistance: lens.focusDistance ?? DEFAULT_DOF_SETTINGS.focusDistance,
+      keepSubjectSize: lens.keepSubjectSize ?? DEFAULT_DOF_SETTINGS.keepSubjectSize,
     });
 
+    const savedSpeed = (data.speed ?? {}) as Partial<SpeedSettings>;
     useSpeedSettingsStore.setState({
-      ...DEFAULT_SPEED_SETTINGS,
-      ...(data.speed as Partial<SpeedSettings> | undefined),
+      moveSpeed: savedSpeed.moveSpeed ?? DEFAULT_SPEED_SETTINGS.moveSpeed,
+      zoomSpeed: savedSpeed.zoomSpeed ?? DEFAULT_SPEED_SETTINGS.zoomSpeed,
+      tiltSpeed: savedSpeed.tiltSpeed ?? DEFAULT_SPEED_SETTINGS.tiltSpeed,
+      panSpeed: savedSpeed.panSpeed ?? DEFAULT_SPEED_SETTINGS.panSpeed,
     });
 
     useLightingStore.setState({
@@ -199,5 +254,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       currentProjectName: typeof data.name === "string" ? data.name : DEFAULT_PROJECT_NAME,
       lastSavedAt: Date.now(),
     });
+    return readMode(data.mode);
   },
 }));
