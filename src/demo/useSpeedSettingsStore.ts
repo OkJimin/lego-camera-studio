@@ -1,9 +1,9 @@
 import { create } from "zustand";
 
-export const DEFAULT_MOVE_SPEED = 5;
-export const DEFAULT_ZOOM_SPEED = 25;
-export const DEFAULT_TILT_SPEED = 0.6;
-export const DEFAULT_PAN_SPEED = 0.6;
+const DEFAULT_MOVE_SPEED = 5;
+const DEFAULT_ZOOM_SPEED = 25;
+const DEFAULT_TILT_SPEED = 0.6;
+const DEFAULT_PAN_SPEED = 0.6;
 
 export const MOVE_SPEED_RANGE = { min: 1, max: 12 };
 export const ZOOM_SPEED_RANGE = { min: 5, max: 60 };

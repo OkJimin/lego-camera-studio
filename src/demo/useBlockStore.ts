@@ -3,13 +3,13 @@ import { generateId } from "./id";
 
 export type BlockColor = "red" | "yellow" | "blue";
 export type ItemKind = "block" | "sphere" | "cone" | "person";
-export type GizmoMode = "translate" | "scale" | "rotate";
+type GizmoMode = "translate" | "scale" | "rotate";
 export const ROTATION_SNAP_DEG = 10;
 
 export const DEFAULT_OBJECT_MOTION_SECONDS = 3;
 export const OBJECT_MOTION_SECONDS_RANGE = { min: 0.5, max: 30 };
 
-export interface ObjectMotion {
+interface ObjectMotion {
   startPosition: [number, number, number];
   endPosition: [number, number, number];
   // Time the object takes to travel start -> end, counted from the start of
@@ -35,7 +35,11 @@ export interface PlacedBlock {
   motion?: ObjectMotion;
   // Left out of exported guide videos (and the 3D shooting guide); it stays in the editor.
   hideInExport?: boolean;
+  // Optional name tag floating above the object, like a nameplate in a game.
+  name?: string;
 }
+
+export const MAX_NAME_LENGTH = 20;
 
 export const BLOCK_COLORS: Record<BlockColor, string> = {
   red: "#d92b2b",
@@ -103,6 +107,7 @@ interface BlockState {
   setMotionEnd: (id: string) => void;
   setMotionDuration: (id: string, seconds: number) => void;
   setHideInExport: (id: string, hidden: boolean) => void;
+  setBlockName: (id: string, name: string) => void;
   clearMotion: (id: string) => void;
 }
 
@@ -200,6 +205,18 @@ export const useBlockStore = create<BlockState>((set, get) => ({
             }
           : b,
       ),
+    })),
+  setBlockName: (id, name) =>
+    set((state) => ({
+      blocks: state.blocks.map((b) => {
+        if (b.id !== id) return b;
+        const copy = { ...b };
+        // Drop the field when blank: Firestore and RTDB reject undefined values,
+        // and a blank name means "no tag".
+        if (name.trim()) copy.name = name.slice(0, MAX_NAME_LENGTH);
+        else delete copy.name;
+        return copy;
+      }),
     })),
   setHideInExport: (id, hidden) =>
     set((state) => ({

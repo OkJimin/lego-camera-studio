@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { isTypingTarget } from "./useSceneShortcuts";
 
 const TRACKED_KEYS = new Set(["w", "a", "s", "d", "q", "e"]);
 
@@ -7,6 +8,7 @@ export function useHeldMoveKeys() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target)) return;
       const key = e.key.toLowerCase();
       if (TRACKED_KEYS.has(key)) heldRef.current.add(key);
     };

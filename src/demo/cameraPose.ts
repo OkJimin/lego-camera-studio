@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type { CameraPose } from "./useCameraPathStore";
 
-export interface SerializedPose {
+interface SerializedPose {
   position: [number, number, number];
   quaternion: [number, number, number, number];
   fov: number;

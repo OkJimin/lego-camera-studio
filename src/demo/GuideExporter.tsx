@@ -11,9 +11,10 @@ import { createGuideClock } from "./playbackClock";
 import type { GuideClock } from "./playbackClock";
 import { extensionForMimeType, pickRecordingMimeType, triggerDownload } from "./recording";
 import { SceneLighting } from "./SceneLighting";
-import { StaticGround } from "./StaticGround";
+import { FloorGrid, StaticGround } from "./StaticGround";
 import { DepthOfFieldEffect } from "./DepthOfFieldEffect";
-import { blockPositionAt, useBlockStore } from "./useBlockStore";
+import { KIND_LABELS, blockPositionAt, useBlockStore } from "./useBlockStore";
+import type { PlacedBlock } from "./useBlockStore";
 import { toUniformKeyframes, useCameraPathStore } from "./useCameraPathStore";
 import { FORMAT_PRESETS, useCameraSettingsStore } from "./useCameraSettingsStore";
 import { useGuideExportStore } from "./useGuideExportStore";
@@ -33,6 +34,14 @@ const FPS_OPTIONS = [30, 60];
 
 type ExportStatus = "options" | "preparing" | "recording" | "done" | "error";
 
+// How an object is listed: its name tag, or "사람 2" when it has none (numbered per kind).
+function objectLabel(objects: PlacedBlock[], index: number): string {
+  const object = objects[index];
+  if (object.name) return object.name;
+  const sameKindBefore = objects.slice(0, index).filter((o) => o.kind === object.kind).length;
+  return `${KIND_LABELS[object.kind]} ${sameKindBefore + 1}`;
+}
+
 function evenPx(value: number): number {
   return Math.max(2, Math.round(value / 2) * 2);
 }
@@ -46,12 +55,17 @@ function ExportScene({
   clock,
   running,
   withDof,
+  showNames,
+  excludedIds,
   onFinished,
 }: {
   path: CameraPathSync;
   clock: GuideClock;
   running: boolean;
   withDof: boolean;
+  showNames: boolean;
+  // Objects left out of this video.
+  excludedIds: ReadonlySet<string>;
   onFinished: () => void;
 }) {
   const { camera } = useThree();
@@ -94,12 +108,18 @@ function ExportScene({
   return (
     <>
       <SceneLighting />
-      <gridHelper args={[24, 24, "#b9b4a4", "#ddd9cc"]} />
+      <FloorGrid />
       <StaticGround />
       {blocks
-        .filter((block) => !block.hideInExport)
+        .filter((block) => !excludedIds.has(block.id))
         .map((block) => (
-          <Block key={block.id} block={block} interactive={false} clock={clock} />
+          <Block
+            key={block.id}
+            block={block}
+            interactive={false}
+            clock={clock}
+            showName={showNames}
+          />
         ))}
       {withDof && <DepthOfFieldEffect getFocusPoint={getFocusPoint} />}
     </>
@@ -123,6 +143,22 @@ function GuideExporterDialog({ onClose }: { onClose: () => void }) {
   const [width, setWidth] = useState(1920);
   const [fps, setFps] = useState(30);
   const [withDof, setWithDof] = useState(() => useCameraSettingsStore.getState().dofEnabled);
+  const [withNames, setWithNames] = useState(true);
+
+  // The object list as it was when the dialog opened; the checkboxes start from
+  // each object's own "exclude from video" setting and can be changed per export.
+  const [objects] = useState(() => useBlockStore.getState().blocks);
+  const [excludedIds, setExcludedIds] = useState<ReadonlySet<string>>(
+    () => new Set(objects.filter((b) => b.hideInExport).map((b) => b.id)),
+  );
+  const toggleObject = (id: string, included: boolean) => {
+    setExcludedIds((current) => {
+      const next = new Set(current);
+      if (included) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
   const height = evenPx(width / aspect);
 
   // Snapshot once: editing the scene mid-export must not change the video.
@@ -265,6 +301,34 @@ function GuideExporterDialog({ onClose }: { onClose: () => void }) {
               />
               심도(배경 흐림) 포함 — 폰 촬영용 가이드는 끄는 게 더 선명해요
             </label>
+            <label className="export-dialog__check">
+              <input
+                type="checkbox"
+                checked={withNames}
+                onChange={(e) => setWithNames(e.target.checked)}
+              />
+              이름표 포함
+            </label>
+
+            {objects.length > 0 && (
+              <div className="export-dialog__objects">
+                <p>영상에 넣을 오브젝트 (체크 해제하면 영상에서 빠져요)</p>
+                <ul>
+                  {objects.map((object, index) => (
+                    <li key={object.id}>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={!excludedIds.has(object.id)}
+                          onChange={(e) => toggleObject(object.id, e.target.checked)}
+                        />
+                        {objectLabel(objects, index)}
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <p className="export-dialog__hint">
               카메라 경로 {path.duration.toFixed(1)}초 · 실시간으로 녹화돼서 같은 시간이 걸려요.
               해상도와 프레임이 높을수록 선명하지만 컴퓨터가 느리면 끊길 수 있어요
@@ -296,6 +360,8 @@ function GuideExporterDialog({ onClose }: { onClose: () => void }) {
                   clock={clock}
                   running={running}
                   withDof={withDof}
+                  showNames={withNames}
+                  excludedIds={excludedIds}
                   onFinished={handleFinished}
                 />
               </Canvas>

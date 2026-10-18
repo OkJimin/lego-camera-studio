@@ -6,7 +6,7 @@ import type { CameraTemplate } from "./cameraTemplates";
 import { createGuideSampler } from "./guidePath";
 import { PersonFigure } from "./PersonFigure";
 import { SceneLighting } from "./SceneLighting";
-import { StaticGround } from "./StaticGround";
+import { FloorGrid, StaticGround } from "./StaticGround";
 
 // Pause on the last frame before looping so the end of the move reads clearly.
 const HOLD_SECONDS = 0.6;
@@ -46,7 +46,7 @@ function TemplateScene({ template, hovering }: { template: CameraTemplate; hover
   return (
     <>
       <SceneLighting />
-      <gridHelper args={[24, 24, "#b9b4a4", "#ddd9cc"]} />
+      <FloorGrid />
       <StaticGround />
       {BACKDROP.map((item, index) => (
         <mesh key={index} position={item.position} scale={item.size}>
