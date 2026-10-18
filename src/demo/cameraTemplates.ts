@@ -17,13 +17,17 @@ const EYE_HEIGHT = 1.6;
 interface Pose {
   position: THREE.Vector3;
   quaternion: THREE.Quaternion;
+  // Lens at this point of the move; the template's own lens when omitted.
+  focalLengthMm?: number;
 }
 
 export interface CameraTemplate {
   id: string;
   name: string;
   description: string;
+  // Starting lens, and how to show it on the card (e.g. "24→85mm" when it zooms).
   focalLengthMm: number;
+  lensLabel: string;
   durationSeconds: number;
   poseAt: (u: number) => Pose;
 }
@@ -58,84 +62,109 @@ function onCircle(radius: number, azimuthDeg: number, y: number): THREE.Vector3 
   return new THREE.Vector3(radius * Math.sin(a), y, radius * Math.cos(a));
 }
 
+// Distance at which a dolly zoom keeps the subject the same size on screen:
+// apparent size ~ 1 / (distance * tan(fov / 2)), and tan(fov / 2) = 12 / mm for
+// the sensor used here, so distance is proportional to the focal length.
+function dollyZoomDistance(focalLengthMm: number): number {
+  return focalLengthMm / 6;
+}
+
+// Ordered as shown in the library: two per row.
 export const CAMERA_TEMPLATES: CameraTemplate[] = [
+  {
+    id: "pan",
+    name: "패닝",
+    description: "제자리에서 왼쪽에서 오른쪽으로 돌려요",
+    focalLengthMm: 50,
+    lensLabel: "50mm",
+    durationSeconds: 6,
+    poseAt: (u) => turnedPose(new THREE.Vector3(0, EYE_HEIGHT, 7), lerp(30, -30, u), 0),
+  },
+  {
+    id: "tilt",
+    name: "틸트",
+    description: "제자리에서 아래에서 위로 올려다봐요",
+    focalLengthMm: 50,
+    lensLabel: "50mm",
+    durationSeconds: 5,
+    poseAt: (u) => turnedPose(new THREE.Vector3(0, 1, 6), 0, lerp(-25, 25, u)),
+  },
   {
     id: "dolly-in",
     name: "돌리 인",
-    description: "피사체 쪽으로 천천히 다가가요",
+    description: "카메라가 피사체 쪽으로 다가가요",
     focalLengthMm: 35,
+    lensLabel: "35mm",
     durationSeconds: 5,
     poseAt: (u) => lookAt(onCircle(lerp(9, 3.5, u), 20, lerp(1.7, 1.4, u)), SUBJECT_CENTER),
   },
   {
-    id: "dolly-out",
-    name: "돌리 아웃",
-    description: "피사체에서 멀어지며 공간을 보여줘요",
-    focalLengthMm: 35,
+    id: "zoom-in",
+    name: "줌 인",
+    description: "카메라는 가만히, 렌즈만 확대해요",
+    focalLengthMm: 24,
+    lensLabel: "24→85mm",
     durationSeconds: 5,
-    poseAt: (u) => lookAt(onCircle(lerp(3.5, 9, u), -20, lerp(1.4, 1.7, u)), SUBJECT_CENTER),
-  },
-  {
-    id: "orbit",
-    name: "오빗",
-    description: "피사체 주위를 반 바퀴 돌아요",
-    focalLengthMm: 35,
-    durationSeconds: 8,
-    poseAt: (u) => lookAt(onCircle(5, lerp(-90, 90, u), EYE_HEIGHT), SUBJECT_CENTER),
+    poseAt: (u) => ({
+      ...lookAt(onCircle(9, 15, 1.5), SUBJECT_CENTER),
+      focalLengthMm: lerp(24, 85, u),
+    }),
   },
   {
     id: "tracking",
     name: "트래킹",
     description: "피사체 앞을 옆으로 나란히 지나가요",
     focalLengthMm: 35,
+    lensLabel: "35mm",
     durationSeconds: 7,
     poseAt: (u) => turnedPose(new THREE.Vector3(lerp(-5, 5, u), 1.5, 6), 0, 0),
+  },
+  {
+    id: "orbit",
+    name: "오빗",
+    description: "피사체 주위를 반 바퀴 돌아요",
+    focalLengthMm: 35,
+    lensLabel: "35mm",
+    durationSeconds: 8,
+    poseAt: (u) => lookAt(onCircle(5, lerp(-90, 90, u), EYE_HEIGHT), SUBJECT_CENTER),
   },
   {
     id: "crane-up",
     name: "크레인 업",
     description: "낮은 곳에서 높이 올라가며 내려다봐요",
     focalLengthMm: 35,
+    lensLabel: "35mm",
     durationSeconds: 6,
     poseAt: (u) => lookAt(new THREE.Vector3(0, lerp(0.8, 6.5, u), 7), SUBJECT_CENTER),
   },
   {
-    id: "crane-down",
-    name: "크레인 다운",
-    description: "높은 곳에서 내려오며 피사체에 가까워져요",
-    focalLengthMm: 35,
+    id: "dolly-zoom",
+    name: "돌리 줌",
+    description: "피사체 크기는 그대로, 배경만 압축돼요",
+    focalLengthMm: 24,
+    lensLabel: "24→85mm",
     durationSeconds: 6,
-    poseAt: (u) => lookAt(new THREE.Vector3(0, lerp(6.5, 0.8, u), 7), SUBJECT_CENTER),
-  },
-  {
-    id: "pan",
-    name: "팬",
-    description: "제자리에서 왼쪽에서 오른쪽으로 돌려요",
-    focalLengthMm: 50,
-    durationSeconds: 6,
-    poseAt: (u) => turnedPose(new THREE.Vector3(0, EYE_HEIGHT, 7), lerp(30, -30, u), 0),
-  },
-  {
-    id: "tilt-up",
-    name: "틸트 업",
-    description: "제자리에서 아래에서 위로 올려다봐요",
-    focalLengthMm: 50,
-    durationSeconds: 5,
-    poseAt: (u) => turnedPose(new THREE.Vector3(0, 1, 6), 0, lerp(-25, 25, u)),
+    poseAt: (u) => {
+      const focalLengthMm = lerp(24, 85, u);
+      return {
+        ...lookAt(onCircle(dollyZoomDistance(focalLengthMm), 10, 1.6), SUBJECT_CENTER),
+        focalLengthMm,
+      };
+    },
   },
 ];
 
-function buildPath(template: CameraTemplate, fov: number): CameraPathSync {
+export function buildPath(template: CameraTemplate): CameraPathSync {
   const count = Math.round(template.durationSeconds * PATH_FPS) + 1;
   const keys: CameraPathKey[] = [];
   for (let i = 0; i < count; i++) {
     const progress = i / (count - 1);
-    const { position, quaternion } = template.poseAt(easeInOut(progress));
+    const { position, quaternion, focalLengthMm } = template.poseAt(easeInOut(progress));
     keys.push({
       t: progress * template.durationSeconds,
       p: [position.x, position.y, position.z],
       q: [quaternion.x, quaternion.y, quaternion.z, quaternion.w],
-      fov,
+      fov: focalLengthToFov(focalLengthMm ?? template.focalLengthMm),
     });
   }
   return { duration: template.durationSeconds, keys };
@@ -146,10 +175,10 @@ function buildPath(template: CameraTemplate, fov: number): CameraPathSync {
 export function startFromTemplate(template: CameraTemplate) {
   useProjectStore.getState().startNewProject();
 
-  const fov = focalLengthToFov(template.focalLengthMm);
-  const keyframes = deserializeKeyframes(buildPath(template, fov));
+  const keyframes = deserializeKeyframes(buildPath(template));
   const first = keyframes[0];
   const last = keyframes[keyframes.length - 1];
+  const fov = first.fov;
 
   const subjectId = generateId();
   useBlockStore.setState({
@@ -170,7 +199,7 @@ export function startFromTemplate(template: CameraTemplate) {
   useCameraPathStore.setState({
     keyframes,
     home: { position: first.position.clone(), quaternion: first.quaternion.clone(), fov },
-    end: { position: last.position.clone(), quaternion: last.quaternion.clone(), fov },
+    end: { position: last.position.clone(), quaternion: last.quaternion.clone(), fov: last.fov },
     autoMoveDuration: template.durationSeconds,
     isPlaying: false,
     isRecording: false,
