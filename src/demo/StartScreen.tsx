@@ -3,6 +3,7 @@ import { describeAuthError, useAuthStore } from "../store/authStore";
 import { CAMERA_TEMPLATES, startFromTemplate } from "./cameraTemplates";
 import type { CameraTemplate } from "./cameraTemplates";
 import { PhoneShootQr } from "./PhoneShootQr";
+import { TemplatePreview } from "./TemplatePreview";
 import { useProjectStore } from "./useProjectStore";
 import { useWorkflowStore } from "./useWorkflowStore";
 
@@ -134,79 +135,109 @@ export function StartScreen() {
 
   return (
     <div className="start-screen">
-      <div className="start-screen__card">
-        <h1>내 라이브러리</h1>
-        <p className="start-screen__account">
-          {user.displayName ?? user.email}
-          <button type="button" className="start-screen__link" onClick={() => signOutUser()}>
-            로그아웃
-          </button>
-        </p>
-
-        <button type="button" className="start-screen__primary" onClick={() => setStep("choose-mode")}>
-          + New
-        </button>
-
-        <button
-          type="button"
-          className="start-screen__secondary"
-          onClick={() => setShowShootQr((v) => !v)}
-        >
-          📱 폰으로 가이드 촬영하기
-        </button>
-        {showShootQr && (
-          <div className="start-screen__shoot">
-            <p>
-              폰으로 QR을 스캔하고 <strong>가이드 영상 선택</strong>을 누르면, 카메라 위에 가이드가
-              반투명하게 겹쳐진 채로 촬영할 수 있어요. 가이드 영상은 노트북에서 내보낸 뒤 폰으로
-              옮겨두세요
-            </p>
-            <PhoneShootQr />
-          </div>
-        )}
-
-        <h2 className="start-screen__section">카메라 템플릿</h2>
-        <div className="start-screen__templates">
-          {CAMERA_TEMPLATES.map((template) => (
-            <button
-              key={template.id}
-              type="button"
-              className="start-screen__template"
-              onClick={() => handleStartTemplate(template)}
-            >
-              <strong>{template.name}</strong>
-              <span>{template.description}</span>
-              <span className="start-screen__project-meta">
-                {template.focalLengthMm}mm · {template.durationSeconds}초
-              </span>
+      <div className="start-screen__card start-screen__card--wide">
+        <div className="start-screen__column">
+          <h1>내 라이브러리</h1>
+          <p className="start-screen__account">
+            {user.displayName ?? user.email}
+            <button type="button" className="start-screen__link" onClick={() => signOutUser()}>
+              로그아웃
             </button>
-          ))}
+          </p>
+
+          <div className="start-screen__actions">
+            <button
+              type="button"
+              className="start-screen__primary"
+              onClick={() => setStep("choose-mode")}
+            >
+              + New
+            </button>
+            <button
+              type="button"
+              className="start-screen__secondary"
+              onClick={() => setShowShootQr((v) => !v)}
+            >
+              📱 폰으로 가이드 촬영하기
+            </button>
+          </div>
+          {showShootQr && (
+            <div className="start-screen__shoot">
+              <p>
+                폰으로 QR을 스캔하고 <strong>가이드 영상 선택</strong>을 누르면, 카메라 위에 가이드가
+                반투명하게 겹쳐진 채로 촬영할 수 있어요. 가이드 영상은 노트북에서 내보낸 뒤 폰으로
+                옮겨두세요
+              </p>
+              <PhoneShootQr />
+            </div>
+          )}
+
+          <h2 className="start-screen__section">내 프로젝트</h2>
+          {error && <p className="start-screen__error">{error}</p>}
+          {isLoadingList && <p>불러오는 중...</p>}
+          {!isLoadingList && myProjects.length === 0 && <p>저장된 프로젝트가 없어요</p>}
+
+          <div className="start-screen__projects">
+            {myProjects.map((project) => (
+              <button
+                key={project.id}
+                type="button"
+                className="start-screen__project-item"
+                disabled={openingId !== null}
+                onClick={() => handleOpen(project.id)}
+              >
+                <span>{project.name}</span>
+                <span className="start-screen__project-meta">
+                  {project.mode === "phone-setup" ? "폰 자이로" : "웹"}
+                  {project.updatedAtMs ? ` · ${formatUpdatedAt(project.updatedAtMs)}` : ""}
+                  {openingId === project.id ? " · 여는 중" : ""}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
 
-        <h2 className="start-screen__section">내 프로젝트</h2>
-        {error && <p className="start-screen__error">{error}</p>}
-        {isLoadingList && <p>불러오는 중...</p>}
-        {!isLoadingList && myProjects.length === 0 && <p>저장된 프로젝트가 없어요</p>}
-
-        <div className="start-screen__projects">
-          {myProjects.map((project) => (
-            <button
-              key={project.id}
-              type="button"
-              className="start-screen__project-item"
-              disabled={openingId !== null}
-              onClick={() => handleOpen(project.id)}
-            >
-              <span>{project.name}</span>
-              <span className="start-screen__project-meta">
-                {project.mode === "phone-setup" ? "폰 자이로" : "웹"}
-                {project.updatedAtMs ? ` · ${formatUpdatedAt(project.updatedAtMs)}` : ""}
-                {openingId === project.id ? " · 여는 중" : ""}
-              </span>
-            </button>
-          ))}
+        <div className="start-screen__column">
+          <h2 className="start-screen__section start-screen__section--top">카메라 템플릿</h2>
+          <p className="start-screen__hint">마우스를 올리면 카메라 움직임을 미리 볼 수 있어요</p>
+          <div className="start-screen__templates">
+            {CAMERA_TEMPLATES.map((template) => (
+              <TemplateCard key={template.id} template={template} onPick={handleStartTemplate} />
+            ))}
+          </div>
         </div>
       </div>
     </div>
+  );
+}
+
+// Plays the template's camera move in a small live preview while hovered or focused.
+function TemplateCard({
+  template,
+  onPick,
+}: {
+  template: CameraTemplate;
+  onPick: (template: CameraTemplate) => void;
+}) {
+  const [hovering, setHovering] = useState(false);
+
+  return (
+    <button
+      type="button"
+      className="start-screen__template"
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => setHovering(false)}
+      onFocus={() => setHovering(true)}
+      onBlur={() => setHovering(false)}
+      onClick={() => onPick(template)}
+    >
+      <div className="start-screen__template-preview">
+        <TemplatePreview template={template} hovering={hovering} />
+        <span className="start-screen__template-lens">{template.lensLabel}</span>
+      </div>
+      <strong>{template.name}</strong>
+      <span>{template.description}</span>
+      <span className="start-screen__project-meta">{template.durationSeconds}초</span>
+    </button>
   );
 }
