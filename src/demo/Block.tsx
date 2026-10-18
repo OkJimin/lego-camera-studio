@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { TransformControls } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
@@ -11,6 +11,7 @@ import {
 } from "./useBlockStore";
 import type { PlacedBlock } from "./useBlockStore";
 import { useCameraPathStore } from "./useCameraPathStore";
+import { NameTag } from "./NameTag";
 import { PersonFigure } from "./PersonFigure";
 import { useClickHandlers } from "./useClickHandlers";
 import { playbackClock } from "./playbackClock";
@@ -24,16 +25,22 @@ const SPHERE_GEOMETRY = new THREE.SphereGeometry(0.5, 24, 24);
 const CONE_GEOMETRY = new THREE.ConeGeometry(0.5, 1, 24);
 const EXCLUDED_OPACITY = 0.35;
 
+// Gap between the top of the object and its name tag.
+const TAG_GAP = 0.3;
+
 export function Block({
   block,
   interactive = true,
   clock,
+  showName = true,
 }: {
   block: PlacedBlock;
   interactive?: boolean;
   // Drive the object's motion from this clock instead of the desktop editor's
   // shared playback state. Only for non-interactive canvases.
   clock?: GuideClock;
+  // Show the object's name tag, if it has one.
+  showName?: boolean;
 }) {
   const addBlock = useBlockStore((s) => s.addBlock);
   const selectedKind = useBlockStore((s) => s.selectedKind);
@@ -98,6 +105,15 @@ export function Block({
     targetObject.position.set(sx + (ex - sx) * t, sy + (ey - sy) * t, sz + (ez - sz) * t);
   });
 
+  // The name tag rides above the object, including while it's dragged or moving.
+  const tagRef = useRef<THREE.Sprite>(null);
+  const tagLift = worldHeight(block.kind, block.size) / 2 + TAG_GAP;
+  useFrame(() => {
+    if (!tagRef.current || !targetObject) return;
+    const { x, y, z } = targetObject.position;
+    tagRef.current.position.set(x, y + tagLift, z);
+  });
+
   // Once playback stops, snap back to the resting (React-driven) position.
   useEffect(() => {
     if (!clock && !isPlaying && targetObject && block.motion) {
@@ -138,6 +154,13 @@ export function Block({
   return (
     <>
       {shape}
+      {showName && block.name && (
+        <NameTag
+          text={block.name}
+          spriteRef={tagRef}
+          position={[block.position[0], block.position[1] + tagLift, block.position[2]]}
+        />
+      )}
       {interactive && isFocused && !isBusy && targetObject && (
         <TransformControls
           object={targetObject}

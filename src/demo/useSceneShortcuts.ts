@@ -1,9 +1,19 @@
 import { useEffect } from "react";
 import { useBlockStore } from "./useBlockStore";
 
+// True while the user is typing into a form field, where keys mean text, not shortcuts.
+export function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
+}
+
 export function useSceneShortcuts() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Without this, Backspace in a name field deletes the selected object and
+      // typing 1/2/3 switches the gizmo.
+      if (isTypingTarget(e.target)) return;
+
       const isUndoCombo = (e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z";
       if (isUndoCombo) {
         e.preventDefault();

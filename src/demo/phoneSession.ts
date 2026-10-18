@@ -72,60 +72,66 @@ export function forgetPhoneSession() {
   }
 }
 
+function sessionRef(sessionId: string, key: string) {
+  return ref(realtimeDb, `sessions/${sessionId}/${key}`);
+}
+
+// Subscribes to one key of the session, passing `fallback` while it's unset.
+function watchKey<T>(sessionId: string, key: string, fallback: T, callback: (value: T) => void) {
+  return onValue(sessionRef(sessionId, key), (snapshot) => callback(snapshot.val() ?? fallback));
+}
+
 export function watchPhoneConnected(sessionId: string, callback: (connected: boolean) => void) {
-  const connectedRef = ref(realtimeDb, `sessions/${sessionId}/phoneConnected`);
-  return onValue(connectedRef, (snapshot) => callback(Boolean(snapshot.val())));
+  return onValue(sessionRef(sessionId, "phoneConnected"), (snapshot) =>
+    callback(Boolean(snapshot.val())),
+  );
 }
 
 export function watchOrientation(
   sessionId: string,
   callback: (orientation: PhoneOrientation | null) => void,
 ) {
-  const orientationRef = ref(realtimeDb, `sessions/${sessionId}/orientation`);
-  return onValue(orientationRef, (snapshot) => callback(snapshot.val()));
+  return watchKey<PhoneOrientation | null>(sessionId, "orientation", null, callback);
 }
 
 export async function joinPhoneSession(sessionId: string): Promise<void> {
   await ensureAnonymousAuth();
-  const connectedRef = ref(realtimeDb, `sessions/${sessionId}/phoneConnected`);
+  const connectedRef = sessionRef(sessionId, "phoneConnected");
   await set(connectedRef, true);
   onDisconnect(connectedRef).set(false);
 }
 
 export function sendOrientation(sessionId: string, orientation: PhoneOrientation) {
-  set(ref(realtimeDb, `sessions/${sessionId}/orientation`), orientation);
+  set(sessionRef(sessionId, "orientation"), orientation);
 }
 
 export function syncBlocks(sessionId: string, blocks: PlacedBlock[]) {
-  set(ref(realtimeDb, `sessions/${sessionId}/blocks`), blocks);
+  set(sessionRef(sessionId, "blocks"), blocks);
 }
 
 export function watchBlocks(sessionId: string, callback: (blocks: PlacedBlock[]) => void) {
-  const blocksRef = ref(realtimeDb, `sessions/${sessionId}/blocks`);
-  return onValue(blocksRef, (snapshot) => callback(snapshot.val() ?? []));
+  return watchKey<PlacedBlock[]>(sessionId, "blocks", [], callback);
 }
 
 export function syncHomePosition(sessionId: string, position: [number, number, number] | null) {
-  set(ref(realtimeDb, `sessions/${sessionId}/homePosition`), position);
+  set(sessionRef(sessionId, "homePosition"), position);
 }
 
 export function watchHomePosition(
   sessionId: string,
   callback: (position: [number, number, number] | null) => void,
 ) {
-  const posRef = ref(realtimeDb, `sessions/${sessionId}/homePosition`);
-  return onValue(posRef, (snapshot) => callback(snapshot.val() ?? null));
+  return watchKey<[number, number, number] | null>(sessionId, "homePosition", null, callback);
 }
 
 // Which way the desktop camera is facing (radians), so the phone can line its
 // gyro heading up with the laptop screen instead of its own arbitrary zero.
 export function syncHomeYaw(sessionId: string, yaw: number) {
-  set(ref(realtimeDb, `sessions/${sessionId}/homeYaw`), yaw);
+  set(sessionRef(sessionId, "homeYaw"), yaw);
 }
 
 export function watchHomeYaw(sessionId: string, callback: (yaw: number | null) => void) {
-  const yawRef = ref(realtimeDb, `sessions/${sessionId}/homeYaw`);
-  return onValue(yawRef, (snapshot) => {
+  return onValue(sessionRef(sessionId, "homeYaw"), (snapshot) => {
     const value = snapshot.val();
     callback(typeof value === "number" ? value : null);
   });
@@ -137,66 +143,61 @@ export interface CameraSettingsSync {
 }
 
 export function syncCameraSettings(sessionId: string, settings: CameraSettingsSync) {
-  set(ref(realtimeDb, `sessions/${sessionId}/cameraSettings`), settings);
+  set(sessionRef(sessionId, "cameraSettings"), settings);
 }
 
 export function watchCameraSettings(
   sessionId: string,
   callback: (settings: CameraSettingsSync | null) => void,
 ) {
-  const settingsRef = ref(realtimeDb, `sessions/${sessionId}/cameraSettings`);
-  return onValue(settingsRef, (snapshot) => callback(snapshot.val() ?? null));
+  return watchKey<CameraSettingsSync | null>(sessionId, "cameraSettings", null, callback);
 }
 
 export function syncLighting(sessionId: string, lighting: LightingSettings) {
-  set(ref(realtimeDb, `sessions/${sessionId}/lighting`), lighting);
+  set(sessionRef(sessionId, "lighting"), lighting);
 }
 
 export function watchLighting(
   sessionId: string,
   callback: (lighting: LightingSettings | null) => void,
 ) {
-  const lightingRef = ref(realtimeDb, `sessions/${sessionId}/lighting`);
-  return onValue(lightingRef, (snapshot) => callback(snapshot.val() ?? null));
+  return watchKey<LightingSettings | null>(sessionId, "lighting", null, callback);
 }
 
 export function syncSpeedSettings(sessionId: string, speed: SpeedSettings) {
-  set(ref(realtimeDb, `sessions/${sessionId}/speedSettings`), speed);
+  set(sessionRef(sessionId, "speedSettings"), speed);
 }
 
 export function watchSpeedSettings(
   sessionId: string,
   callback: (speed: SpeedSettings | null) => void,
 ) {
-  const speedRef = ref(realtimeDb, `sessions/${sessionId}/speedSettings`);
-  return onValue(speedRef, (snapshot) => callback(snapshot.val() ?? null));
+  return watchKey<SpeedSettings | null>(sessionId, "speedSettings", null, callback);
 }
 
 export function syncCameraPath(sessionId: string, path: CameraPathSync) {
-  set(ref(realtimeDb, `sessions/${sessionId}/cameraPath`), path);
+  set(sessionRef(sessionId, "cameraPath"), path);
 }
 
 export function watchCameraPath(sessionId: string, callback: (path: CameraPathSync | null) => void) {
-  const pathRef = ref(realtimeDb, `sessions/${sessionId}/cameraPath`);
-  return onValue(pathRef, (snapshot) => callback(snapshot.val() ?? null));
+  return watchKey<CameraPathSync | null>(sessionId, "cameraPath", null, callback);
 }
 
 // Phone -> desktop: the camera path the phone just recorded with its gyro.
 // Kept apart from `cameraPath` (desktop -> capture page) so the two directions
 // can't echo each other.
 export function sendRecordedPath(sessionId: string, path: CameraPathSync) {
-  return set(ref(realtimeDb, `sessions/${sessionId}/recordedPath`), path);
+  return set(sessionRef(sessionId, "recordedPath"), path);
 }
 
 // Wipe any recording left over from an earlier visit, so a stale one isn't
 // mistaken for something the phone just recorded.
 export function clearRecordedPath(sessionId: string) {
-  return set(ref(realtimeDb, `sessions/${sessionId}/recordedPath`), null);
+  return set(sessionRef(sessionId, "recordedPath"), null);
 }
 
 export function watchRecordedPath(sessionId: string, callback: (path: CameraPathSync) => void) {
-  const pathRef = ref(realtimeDb, `sessions/${sessionId}/recordedPath`);
-  return onValue(pathRef, (snapshot) => {
+  return onValue(sessionRef(sessionId, "recordedPath"), (snapshot) => {
     const value = snapshot.val() as CameraPathSync | null;
     if (value && Array.isArray(value.keys) && value.keys.length >= 2) callback(value);
   });

@@ -109,7 +109,9 @@ export function CameraSettingsPanel() {
 
           {focusBlock ? (
             <div className="panel__row">
-              <p className="panel__hint">초점 고정: {KIND_LABELS[focusBlock.kind]}</p>
+              <p className="panel__hint">
+                초점 고정: {focusBlock.name ?? KIND_LABELS[focusBlock.kind]}
+              </p>
               <button type="button" onClick={() => setFocusBlockId(null)}>
                 자동 초점으로
               </button>

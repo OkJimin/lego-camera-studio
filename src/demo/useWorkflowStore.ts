@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type WorkflowMode = "start" | "web" | "phone-setup";
+type WorkflowMode = "start" | "web" | "phone-setup";
 
 function readSessionIdFromUrl(urlMode: "phone" | "capture"): string | null {
   const params = new URLSearchParams(window.location.search);

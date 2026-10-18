@@ -32,9 +32,9 @@ import { DEFAULT_SPEED_SETTINGS, useSpeedSettingsStore } from "./useSpeedSetting
 import type { SpeedSettings } from "./useSpeedSettingsStore";
 import { useWorkflowStore } from "./useWorkflowStore";
 
-export type ProjectMode = "web" | "phone-setup";
+type ProjectMode = "web" | "phone-setup";
 
-export interface ProjectSummary {
+interface ProjectSummary {
   id: string;
   name: string;
   mode: ProjectMode;
@@ -58,17 +58,26 @@ async function ensureSignedInUid(): Promise<string | null> {
   return signedIn && !signedIn.isAnonymous ? signedIn.uid : null;
 }
 
+type SavedLens = { fov?: number; formatIndex?: number } & Partial<DepthOfFieldSettings>;
+
+// The lens fields every saved project is expected to have, defaulted when missing.
+function readLensBasics(lens: SavedLens) {
+  return {
+    fov: typeof lens.fov === "number" ? lens.fov : DEFAULT_LENS_FOV,
+    formatIndex: typeof lens.formatIndex === "number" ? lens.formatIndex : 0,
+  };
+}
+
 export async function fetchProjectForShoot(id: string): Promise<CaptureData | null> {
   const snapshot = await getDoc(doc(firestore, "projects", id));
   if (!snapshot.exists()) return null;
   const data = snapshot.data();
   const cameraPath = (data.cameraPath ?? null) as CameraPathSync | null;
-  const lens = (data.lens ?? {}) as { fov?: number; formatIndex?: number };
-  const formatIndex = typeof lens.formatIndex === "number" ? lens.formatIndex : 0;
+  const { fov, formatIndex } = readLensBasics((data.lens ?? {}) as SavedLens);
   return {
     blocks: (data.blocks ?? []) as PlacedBlock[],
     path: cameraPath && cameraPath.keys?.length >= 2 ? cameraPath : null,
-    fov: typeof lens.fov === "number" ? lens.fov : DEFAULT_LENS_FOV,
+    fov,
     aspect: FORMAT_PRESETS[formatIndex]?.aspect,
   };
 }
@@ -224,10 +233,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       isRecording: false,
     });
 
-    const lens = (data.lens ?? {}) as { fov?: number; formatIndex?: number } & Partial<DepthOfFieldSettings>;
+    const lens = (data.lens ?? {}) as SavedLens;
+    const { fov, formatIndex } = readLensBasics(lens);
     useCameraSettingsStore.setState({
-      lensFov: typeof lens.fov === "number" ? lens.fov : DEFAULT_LENS_FOV,
-      formatIndex: typeof lens.formatIndex === "number" ? lens.formatIndex : 0,
+      lensFov: fov,
+      formatIndex,
       // Projects saved before depth of field existed load with it off.
       dofEnabled: lens.dofEnabled ?? DEFAULT_DOF_SETTINGS.dofEnabled,
       blurStrength: lens.blurStrength ?? DEFAULT_DOF_SETTINGS.blurStrength,

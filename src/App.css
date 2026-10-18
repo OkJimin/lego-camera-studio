@@ -5,10 +5,13 @@ body,
   margin: 0;
 }
 
+/* Pinned to the viewport instead of sized with 100vw/100vh: those ignore the
+   scrollbar and #root's border, so the workspace used to overflow the page and
+   bring up page scrollbars that scrolled the scene away. */
 .demo-shell {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
   font-family: system-ui, sans-serif;
 }
 
@@ -19,23 +22,25 @@ body,
   touch-action: none;
 }
 
+/* The side panels are few and short, so they just lay out in full: no inner
+   scrolling in either direction. */
 .side-stack {
   position: absolute;
   top: 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  max-height: calc(100vh - 2rem);
-  overflow-y: auto;
   z-index: 10;
-  max-width: 260px;
+  width: 260px;
+}
+
+.side-stack img {
+  max-width: 100%;
+  height: auto;
 }
 
 .side-stack--left {
   left: 1rem;
-  /* Leave room so this panel's scroll area never sits behind the camera monitor
-     pinned to the bottom-left corner (see .monitor below). */
-  max-height: calc(100vh - 14rem);
 }
 
 .right-rail {
@@ -78,6 +83,35 @@ body,
   white-space: nowrap;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   flex-shrink: 0;
+}
+
+.panel--closable {
+  position: relative;
+}
+
+/* Keeps a long title from running under the close button. */
+.panel--closable h2 {
+  padding: 0 1.7rem;
+}
+
+.panel__close {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.5rem;
+  width: 1.7rem;
+  height: 1.7rem;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #666;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.panel__close:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: #222;
 }
 
 .panel {
@@ -125,17 +159,6 @@ body,
 
 .panel__field input[type="range"] {
   width: 100%;
-}
-
-.panel__number {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  font-size: 0.75rem;
-}
-
-.panel__number input {
-  width: 64px;
 }
 
 .chip {
@@ -728,6 +751,35 @@ button {
   gap: 0.4rem;
   margin-bottom: 0.5rem;
   font-size: 0.8rem;
+}
+
+.export-dialog__objects {
+  margin: 0.4rem 0 0.6rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid #e2dfd4;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+.export-dialog__objects p {
+  margin: 0 0 0.3rem;
+  color: #666;
+}
+
+.export-dialog__objects ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 9rem;
+  overflow-y: auto;
+}
+
+.export-dialog__objects label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0;
 }
 
 .export-dialog__next {

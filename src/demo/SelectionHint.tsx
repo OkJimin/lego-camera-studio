@@ -1,6 +1,7 @@
 import {
   DEFAULT_OBJECT_MOTION_SECONDS,
   KIND_LABELS,
+  MAX_NAME_LENGTH,
   OBJECT_MOTION_SECONDS_RANGE,
   useBlockStore,
 } from "./useBlockStore";
@@ -16,6 +17,7 @@ export function SelectionHint() {
   const setMotionEnd = useBlockStore((s) => s.setMotionEnd);
   const setMotionDuration = useBlockStore((s) => s.setMotionDuration);
   const setHideInExport = useBlockStore((s) => s.setHideInExport);
+  const setBlockName = useBlockStore((s) => s.setBlockName);
   const focusBlockId = useCameraSettingsStore((s) => s.focusBlockId);
   const setFocusBlockId = useCameraSettingsStore((s) => s.setFocusBlockId);
   const setDofEnabled = useCameraSettingsStore((s) => s.setDofEnabled);
@@ -30,10 +32,33 @@ export function SelectionHint() {
   const isFocusTarget = focusBlockId === block.id;
 
   return (
-    <div className="panel">
-      <h2>{KIND_LABELS[block.kind]} 선택됨</h2>
+    <div className="panel panel--closable">
+      <button
+        type="button"
+        className="panel__close"
+        aria-label="닫기"
+        title="닫기 (선택 해제)"
+        onClick={() => focusBlock(null)}
+      >
+        ×
+      </button>
+      <h2>
+        {block.name ? `${block.name} (${KIND_LABELS[block.kind]})` : KIND_LABELS[block.kind]} 선택됨
+      </h2>
       <p className="panel__hint">1: 이동 · 2: 크기 · 3: 회전(10° 단위)</p>
       <p className="panel__hint">기즈모 화살표/박스를 드래그해서 조절하세요</p>
+
+      <label className="panel__field">
+        이름표 (비워두면 표시 안 해요)
+        <input
+          type="text"
+          className="project-name-input"
+          maxLength={MAX_NAME_LENGTH}
+          value={block.name ?? ""}
+          placeholder="예: 주인공"
+          onChange={(e) => setBlockName(block.id, e.target.value)}
+        />
+      </label>
 
       <p className="panel__hint">
         이 오브젝트의 움직임 (카메라 재생과 같은 타임라인)
@@ -103,9 +128,6 @@ export function SelectionHint() {
       <div className="panel__row">
         <button type="button" onClick={() => removeBlock(block.id)}>
           삭제 (Delete)
-        </button>
-        <button type="button" onClick={() => focusBlock(null)}>
-          선택 해제
         </button>
       </div>
     </div>

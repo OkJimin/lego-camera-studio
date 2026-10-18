@@ -4,6 +4,7 @@ import { CameraPathPreview } from "./CameraPathPreview";
 import { CameraRig } from "./CameraRig";
 import { Ground } from "./Ground";
 import { SceneLighting } from "./SceneLighting";
+import { FloorGrid } from "./StaticGround";
 import { DepthOfFieldEffect, editorFocusPoint } from "./DepthOfFieldEffect";
 import { useBlockStore } from "./useBlockStore";
 import { useCameraSettingsStore } from "./useCameraSettingsStore";
@@ -18,18 +19,21 @@ export function Scene() {
   return (
     <Canvas
       shadows
+      // Capped below the usual 2: on a high-DPI screen that's 4x the pixels to
+      // draw every frame, which shows up as choppy camera playback.
+      dpr={[1, 1.5]}
       frameloop={exporting ? "never" : "always"}
       camera={{ position: [8, 8, 8], fov: 50 }}
     >
       <SceneLighting castShadow />
-      <gridHelper args={[24, 24, "#b9b4a4", "#ddd9cc"]} />
+      <FloorGrid />
       <Ground />
       {blocks.map((block) => (
         <Block key={block.id} block={block} />
       ))}
       <CameraPathPreview />
       <CameraRig />
-      {showDof && <DepthOfFieldEffect getFocusPoint={editorFocusPoint} />}
+      {showDof && <DepthOfFieldEffect getFocusPoint={editorFocusPoint} quality="editor" />}
     </Canvas>
   );
 }

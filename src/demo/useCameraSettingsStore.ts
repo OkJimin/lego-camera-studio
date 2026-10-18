@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export interface LensPreset {
+interface LensPreset {
   label: string;
   focalLengthMm: number;
 }
@@ -22,7 +22,7 @@ export function focalLengthToFov(focalLengthMm: number): number {
   return (radians * 180) / Math.PI;
 }
 
-export interface FormatPreset {
+interface FormatPreset {
   label: string;
   aspect: number;
 }

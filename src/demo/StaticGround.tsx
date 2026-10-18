@@ -8,3 +8,8 @@ export function StaticGround() {
     </mesh>
   );
 }
+
+// The grid drawn over the ground, shared by the editor and the canvases that mirror it.
+export function FloorGrid() {
+  return <gridHelper args={[24, 24, "#b9b4a4", "#ddd9cc"]} />;
+}

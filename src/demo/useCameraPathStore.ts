@@ -28,7 +28,7 @@ export function toUniformKeyframes(keyframes: CameraKeyframe[]): CameraKeyframe[
   return path ? deserializeKeyframes(path) : keyframes;
 }
 
-export type PendingCameraAction = "save-home" | "go-home" | "save-end" | "go-end" | null;
+type PendingCameraAction = "save-home" | "go-home" | "save-end" | "go-end" | null;
 
 export interface CameraPose {
   position: THREE.Vector3;
